@@ -6,9 +6,11 @@ const DEFAULTS={
 };
 const STORAGE_KEY="monPotagerSettingsV2";
 let weatherRows=[];
+let deferredInstallPrompt=null;
 
 document.addEventListener("DOMContentLoaded",()=>{
   bindEvents();
+  setupInstallPrompt();
   loadSettingsIntoForm();
   refresh();
   registerServiceWorker();
@@ -20,6 +22,7 @@ function bindEvents(){
   document.querySelector("#settingsForm").addEventListener("submit",saveSettings);
   document.querySelector("#seasonMode").addEventListener("change",toggleCustomKc);
   document.querySelector("#useLocationButton").addEventListener("click",useCurrentLocation);
+  document.querySelector("#installButton").addEventListener("click",installApp);
   window.addEventListener("resize",()=>weatherRows.length&&renderChart());
 }
 
@@ -162,148 +165,42 @@ function renderForecast(today){
   });
 }
 
-function renderChart() {
-  const canvas = document.querySelector("#weatherChart");
-  const ctx = canvas.getContext("2d");
+function renderChart(){
+  const canvas=document.querySelector("#weatherChart");
+  const ctx=canvas.getContext("2d");
+  const ratio=window.devicePixelRatio||1;
+  const width=canvas.clientWidth||650,height=230;
+  canvas.width=width*ratio;canvas.height=height*ratio;
+  ctx.scale(ratio,ratio);ctx.clearRect(0,0,width,height);
 
-  const ratio = window.devicePixelRatio || 1;
-  const width = canvas.clientWidth || 650;
-  const height = 230;
+  const today=localDateString(new Date());
+  const rows=weatherRows.filter(r=>r.date<=today).slice(-10);
+  if(!rows.length)return;
 
-  canvas.width = width * ratio;
-  canvas.height = height * ratio;
+  const pad={left:30,right:10,top:16,bottom:35};
+  const chartW=width-pad.left-pad.right,chartH=height-pad.top-pad.bottom;
+  const max=Math.max(1,...rows.flatMap(r=>[r.etp,r.rain]));
+  const groupW=chartW/rows.length,barW=Math.min(16,groupW*.28);
 
-  ctx.scale(ratio, ratio);
-  ctx.clearRect(0, 0, width, height);
-
-  const today = localDateString(new Date());
-
-  const rows = weatherRows
-    .filter(row => row.date <= today)
-    .slice(-10);
-
-  if (!rows.length) return;
-
-  // Marges du graphique
-  const pad = {
-    left: 48,
-    right: 10,
-    top: 20,
-    bottom: 35
-  };
-
-  const chartW = width - pad.left - pad.right;
-  const chartH = height - pad.top - pad.bottom;
-
-  // Valeur maximale du graphique
-  const valeurMax = Math.max(
-    1,
-    ...rows.flatMap(row => [row.etp, row.rain])
-  );
-
-  // Arrondi de l'échelle au nombre entier supérieur
-  const max = Math.ceil(valeurMax);
-
-  const groupW = chartW / rows.length;
-  const barW = Math.min(16, groupW * 0.28);
-
-  // ==========================================================
-  // GRILLE + ÉCHELLE VERTICALE
-  // ==========================================================
-
-  ctx.font = "11px system-ui";
-  ctx.textBaseline = "middle";
-
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.top + (chartH * i) / 4;
-    const valeur = max * (1 - i / 4);
-
-    // Ligne horizontale
-    ctx.strokeStyle = "#dbe5dd";
-    ctx.lineWidth = 1;
-
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y);
-    ctx.lineTo(width - pad.right, y);
-    ctx.stroke();
-
-    // Valeur de l'échelle
-    ctx.fillStyle = "#68766c";
-    ctx.textAlign = "right";
-
-    ctx.fillText(
-      round(valeur, 1) + " mm",
-      pad.left - 7,
-      y
-    );
+  ctx.strokeStyle="#dbe5dd";ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.top+chartH*i/4;
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(width-pad.right,y);ctx.stroke();
   }
 
-  // ==========================================================
-  // AXES
-  // ==========================================================
+  rows.forEach((r,i)=>{
+    const x=pad.left+i*groupW+groupW/2;
+    drawBar(ctx,x-barW-2,r.etp,"#e6a04b");
+    drawBar(ctx,x+2,r.rain,"#4e9ad1");
+    ctx.fillStyle="#68766c";ctx.font="10px system-ui";ctx.textAlign="center";
+    ctx.fillText(shortDay(r.date),x,height-12);
 
-  ctx.strokeStyle = "#68766c";
-  ctx.lineWidth = 1.2;
-
-  // Axe vertical
-  ctx.beginPath();
-  ctx.moveTo(pad.left, pad.top);
-  ctx.lineTo(pad.left, pad.top + chartH);
-  ctx.stroke();
-
-  // Axe horizontal
-  ctx.beginPath();
-  ctx.moveTo(pad.left, pad.top + chartH);
-  ctx.lineTo(width - pad.right, pad.top + chartH);
-  ctx.stroke();
-
-  // ==========================================================
-  // BARRES ETP ET PLUIE
-  // ==========================================================
-
-  rows.forEach((row, index) => {
-    const x =
-      pad.left +
-      index * groupW +
-      groupW / 2;
-
-    dessinerBarre(
-      x - barW - 2,
-      row.etp,
-      "#e6a04b"
-    );
-
-    dessinerBarre(
-      x + 2,
-      row.rain,
-      "#4e9ad1"
-    );
-
-    // Date sous le graphique
-    ctx.fillStyle = "#68766c";
-    ctx.font = "10px system-ui";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "alphabetic";
-
-    ctx.fillText(
-      shortDay(row.date),
-      x,
-      height - 12
-    );
+    function drawBar(context,bx,value,color){
+      const h=(value/max)*chartH;
+      context.fillStyle=color;
+      context.fillRect(bx,pad.top+chartH-h,barW,h);
+    }
   });
-
-  function dessinerBarre(x, valeur, couleur) {
-    const hauteur = (valeur / max) * chartH;
-
-    ctx.fillStyle = couleur;
-
-    ctx.fillRect(
-      x,
-      pad.top + chartH - hauteur,
-      barW,
-      hauteur
-    );
-  }
 }
 
 function weatherIcon(code){
@@ -378,6 +275,45 @@ function useCurrentLocation(){
       maximumAge:300000
     }
   );
+}
+
+
+function setupInstallPrompt(){
+  const installCard=document.querySelector("#installCard");
+
+  window.addEventListener("beforeinstallprompt",event=>{
+    event.preventDefault();
+    deferredInstallPrompt=event;
+    installCard.hidden=false;
+  });
+
+  window.addEventListener("appinstalled",()=>{
+    deferredInstallPrompt=null;
+    installCard.hidden=true;
+  });
+
+  const standalone=
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone===true;
+
+  if(standalone){
+    installCard.hidden=true;
+  }
+}
+
+async function installApp(){
+  if(!deferredInstallPrompt){
+    const card=document.querySelector("#installCard");
+    card.hidden=false;
+    const copy=card.querySelector(".install-copy");
+    copy.textContent="Dans Chrome, ouvre le menu ⋮ puis choisis « Installer l’application » ou « Ajouter à l’écran d’accueil ».";
+    return;
+  }
+
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt=null;
+  document.querySelector("#installCard").hidden=true;
 }
 
 function registerServiceWorker(){

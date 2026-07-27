@@ -36,3 +36,9 @@ main{width:min(760px,100%);margin:0 auto;padding:16px 14px 34px}
 canvas{width:100%;max-width:100%;display:block}
 @media(min-width:650px){.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:520px){.forecast-row{grid-template-columns:1.1fr .35fr .65fr .65fr .8fr}.forecast-row span{font-size:.76rem}}
+
+.install-card{
+  border:1px solid #cfe3d5;
+  background:linear-gradient(145deg,#ffffff,#eff9f1)
+}
+.install-copy{margin:0 0 14px}

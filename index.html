@@ -7,6 +7,10 @@
   <meta name="description" content="Application de pilotage de l'arrosage du potager.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Mon Potager">
   <link rel="stylesheet" href="./style.css">
   <title>Mon Potager</title>
 </head>
@@ -20,6 +24,15 @@
 </header>
 
 <main>
+
+  <section id="installCard" class="card install-card" hidden>
+    <div>
+      <p class="label">Installation</p>
+      <h2>Ajouter Mon Potager au téléphone</h2>
+      <p class="muted install-copy">L’application s’ouvrira plein écran depuis une icône sur l’écran d’accueil.</p>
+    </div>
+    <button id="installButton" class="primary-button">📲 Installer l’application</button>
+  </section>
   <section id="heroCard" class="hero card status-green">
     <div class="status-line">
       <span id="statusDot" class="status-dot"></span>

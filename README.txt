@@ -1,29 +1,35 @@
-MISE À JOUR — LOCALISATION MODIFIABLE
+MON POTAGER — VERSION INSTALLABLE PWA
 
-NOUVEAUTÉS
-- Saisie directe de la latitude et de la longitude dans les paramètres.
-- Bouton « Utiliser ma position actuelle ».
-- Enregistrement automatique de la position sur le téléphone.
-- Actualisation météo immédiate après validation GPS.
+FICHIERS À REMPLACER SUR GITHUB
+- index.html
+- style.css
+- app.js
+- manifest.webmanifest
+- service-worker.js
+- icon.svg
 
-MISE À JOUR SUR GITHUB
+NOUVEAUX FICHIERS À AJOUTER
+- icon-192.png
+- icon-512.png
+- icon-maskable-512.png
+- apple-touch-icon.png
+
+MISE À JOUR
 1. Décompresse le ZIP.
-2. Dans le dépôt GitHub mon-potager, clique sur Add file > Upload files.
-3. Ajoute et remplace :
-   - index.html
-   - app.js
-   - service-worker.js
-   - style.css
-   - manifest.webmanifest
-   - icon.svg
+2. Dans GitHub > mon-potager > Add file > Upload files.
+3. Glisse tous les fichiers du ZIP.
 4. Clique sur Commit changes.
-5. Attends une à deux minutes.
-6. Ouvre le site dans Chrome et actualise deux fois.
+5. Attends environ 2 minutes.
+6. Ouvre le site dans Chrome.
+7. Actualise deux fois.
+8. Un encart « Installer l’application » doit apparaître.
+9. Appuie sur le bouton pour installer.
 
-UTILISATION
-1. Ouvre Paramètres.
-2. Clique sur « Utiliser ma position actuelle ».
-3. Autorise Chrome à accéder à ta localisation.
-4. La météo se recharge automatiquement pour cette position.
+SI LE BOUTON N’APPARAÎT PAS
+- Menu Chrome ⋮ > Installer l’application
+- ou Menu Chrome ⋮ > Ajouter à l’écran d’accueil
+- ferme puis rouvre Chrome après la mise à jour
+- en dernier recours, supprime l’ancien raccourci puis recharge le site
 
-La localisation est enregistrée uniquement sur l'appareil utilisé.
+ADRESSE
+https://juchabs42.github.io/mon-potager/

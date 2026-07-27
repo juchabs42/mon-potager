@@ -1,19 +1,35 @@
 {
+  "id": "/mon-potager/",
   "name": "Mon Potager",
   "short_name": "Potager",
   "description": "Application de pilotage de l'arrosage du potager.",
-  "lang": "fr",
-  "start_url": "./",
+  "lang": "fr-FR",
+  "start_url": "./?source=pwa",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
   "background_color": "#eef5ef",
   "theme_color": "#1f6f43",
+  "categories": ["utilities", "lifestyle"],
   "icons": [
     {
-      "src": "./icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
