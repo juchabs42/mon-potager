@@ -1,0 +1,19 @@
+{
+  "name": "Mon Potager",
+  "short_name": "Potager",
+  "description": "Conseil d'arrosage pour mon potager.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef5ef",
+  "theme_color": "#1f6f43",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
