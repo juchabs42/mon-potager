@@ -1,7 +1,7 @@
 
 const SEASON_KC={start:.6,full:.9,end:.7};
 const DEFAULTS={
-  latitude:43.793905,longitude:4.014820,surface:8,flow:8,kc:.9,
+  latitude:43.793931,longitude:4.014810,surface:8,flow:8,kc:.9,
   seasonMode:"full",rainEfficiency:.8,lastWatering:localDateString(new Date())
 };
 const STORAGE_KEY="monPotagerSettingsV2";
@@ -19,6 +19,7 @@ function bindEvents(){
   document.querySelector("#wateredButton").addEventListener("click",markWatered);
   document.querySelector("#settingsForm").addEventListener("submit",saveSettings);
   document.querySelector("#seasonMode").addEventListener("change",toggleCustomKc);
+  document.querySelector("#useLocationButton").addEventListener("click",useCurrentLocation);
   window.addEventListener("resize",()=>weatherRows.length&&renderChart());
 }
 
@@ -31,7 +32,7 @@ function activeKc(s){return s.seasonMode==="custom"?num(s.kc):(SEASON_KC[s.seaso
 
 function loadSettingsIntoForm(){
   const s=settings();
-  ["surface","flow","kc","rainEfficiency","lastWatering","seasonMode"]
+  ["latitude","longitude","surface","flow","kc","rainEfficiency","lastWatering","seasonMode"]
     .forEach(id=>document.querySelector("#"+id).value=s[id]);
   toggleCustomKc();
 }
@@ -222,12 +223,55 @@ function saveSettings(e){
   const s=settings();
   const n={
     ...s,
+    latitude:num(val("latitude")),longitude:num(val("longitude")),
     surface:num(val("surface")),flow:num(val("flow")),
     kc:num(val("kc")),seasonMode:val("seasonMode"),
     rainEfficiency:num(val("rainEfficiency")),
     lastWatering:val("lastWatering")
   };
   persistSettings(n);render();
+}
+
+
+function useCurrentLocation(){
+  const status=document.querySelector("#locationStatus");
+
+  if(!navigator.geolocation){
+    status.textContent="La géolocalisation n’est pas disponible sur cet appareil.";
+    return;
+  }
+
+  status.textContent="Recherche de la position…";
+
+  navigator.geolocation.getCurrentPosition(
+    position=>{
+      const latitude=round(position.coords.latitude,6);
+      const longitude=round(position.coords.longitude,6);
+
+      document.querySelector("#latitude").value=latitude;
+      document.querySelector("#longitude").value=longitude;
+
+      const s=settings();
+      s.latitude=latitude;
+      s.longitude=longitude;
+      persistSettings(s);
+
+      status.textContent=`Position enregistrée : ${latitude}, ${longitude}`;
+      refresh();
+    },
+    error=>{
+      let message="Impossible d’obtenir la position.";
+      if(error.code===1)message="Autorisation de localisation refusée.";
+      if(error.code===2)message="Position indisponible.";
+      if(error.code===3)message="La recherche de position a expiré.";
+      status.textContent=message;
+    },
+    {
+      enableHighAccuracy:true,
+      timeout:15000,
+      maximumAge:300000
+    }
+  );
 }
 
 function registerServiceWorker(){
