@@ -183,7 +183,7 @@ function renderChart() {
 
   const rows = weatherRows
     .filter(row => row.date <= today)
-    .slice(-10);
+    .slice(-7);
 
   if (!rows.length) return;
 
