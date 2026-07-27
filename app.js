@@ -1,7 +1,7 @@
 
 const SEASON_KC={start:.6,full:.9,end:.7};
 const DEFAULTS={
-  latitude:43.793931,longitude:4.014810,surface:8,flow:8,kc:.9,
+  latitude:43.793905,longitude:4.014820,surface:8,flow:8,kc:.9,
   seasonMode:"full",rainEfficiency:.8,lastWatering:localDateString(new Date())
 };
 const STORAGE_KEY="monPotagerSettingsV2";
