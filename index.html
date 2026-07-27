@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1f6f43">
-  <meta name="description" content="Conseil d'arrosage pour un potager de 8 m².">
+  <meta name="description" content="Application de pilotage de l'arrosage du potager.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css">
@@ -12,31 +12,76 @@
 </head>
 <body>
 <header class="topbar">
-  <div><p class="eyebrow">PILOTAGE D’ARROSAGE</p><h1>🌱 Mon Potager</h1></div>
+  <div>
+    <p class="eyebrow">PILOTAGE D’ARROSAGE</p>
+    <h1>🌱 Mon Potager</h1>
+  </div>
   <button id="refreshButton" class="icon-button" aria-label="Actualiser">↻</button>
 </header>
+
 <main>
-  <section class="hero card">
-    <p class="label">Conseil actuel</p>
-    <h2 id="advice">Chargement…</h2>
-    <div class="hero-grid">
-      <div><span class="metric-label">À apporter</span><strong id="volume">— L</strong></div>
-      <div><span class="metric-label">Durée</span><strong id="duration">—</strong></div>
+  <section id="heroCard" class="hero card status-green">
+    <div class="status-line">
+      <span id="statusDot" class="status-dot"></span>
+      <p class="label">Conseil actuel</p>
     </div>
+    <h2 id="advice">Chargement…</h2>
+    <p id="rainAdvice" class="rain-advice"></p>
+
+    <div class="hero-grid">
+      <div>
+        <span class="metric-label">À apporter</span>
+        <strong id="volume">— L</strong>
+      </div>
+      <div>
+        <span class="metric-label">Durée</span>
+        <strong id="duration">—</strong>
+      </div>
+    </div>
+
     <button id="wateredButton" class="primary-button">💧 J’ai arrosé</button>
-    <p id="lastWateringText" class="muted"></p>
+    <div class="watering-meta">
+      <span id="lastWateringText"></span>
+      <span id="daysSinceWatering"></span>
+    </div>
   </section>
 
   <section class="metrics">
-    <article class="card metric-card"><span>ETP cumulée</span><strong id="etpTotal">— mm</strong></article>
-    <article class="card metric-card"><span>Pluie cumulée</span><strong id="rainTotal">— mm</strong></article>
-    <article class="card metric-card"><span>Dose nette</span><strong id="dose">— mm</strong></article>
-    <article class="card metric-card"><span>Pluie demain</span><strong id="rainTomorrow">— mm</strong></article>
+    <article class="card metric-card">
+      <span>ETP cumulée</span>
+      <strong id="etpTotal">— mm</strong>
+    </article>
+    <article class="card metric-card">
+      <span>Pluie cumulée</span>
+      <strong id="rainTotal">— mm</strong>
+    </article>
+    <article class="card metric-card">
+      <span>Dose nette</span>
+      <strong id="dose">— mm</strong>
+    </article>
+    <article class="card metric-card">
+      <span>Pluie à 3 jours</span>
+      <strong id="rain3Days">— mm</strong>
+    </article>
   </section>
 
   <section class="card">
     <div class="section-heading">
-      <div><p class="label">Météo</p><h2>7 prochains jours</h2></div>
+      <div>
+        <p class="label">Évolution récente</p>
+        <h2>ETP et pluie</h2>
+      </div>
+      <span class="legend"><i class="bar etp"></i>ETP <i class="bar rain"></i>Pluie</span>
+    </div>
+    <canvas id="weatherChart" height="230"></canvas>
+  </section>
+
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <p class="label">Météo</p>
+        <h2>7 prochains jours</h2>
+      </div>
       <span id="updatedAt" class="muted"></span>
     </div>
     <div id="forecast" class="forecast-list"></div>
@@ -45,11 +90,35 @@
   <details class="card settings-card">
     <summary>⚙️ Paramètres</summary>
     <form id="settingsForm">
-      <label>Surface du potager (m²)<input id="surface" type="number" min="0.1" step="0.1" required></label>
-      <label>Débit du tuyau (L/min)<input id="flow" type="number" min="0.1" step="0.1" required></label>
-      <label>Coefficient cultural Kc<input id="kc" type="number" min="0" max="2" step="0.05" required></label>
-      <label>Efficacité de la pluie<input id="rainEfficiency" type="number" min="0" max="1" step="0.05" required></label>
-      <label>Date du dernier arrosage<input id="lastWatering" type="date" required></label>
+      <label>
+        Surface du potager (m²)
+        <input id="surface" type="number" min="0.1" step="0.1" required>
+      </label>
+      <label>
+        Débit du tuyau (L/min)
+        <input id="flow" type="number" min="0.1" step="0.1" required>
+      </label>
+      <label>
+        Stade de la saison
+        <select id="seasonMode">
+          <option value="start">Début de saison — Kc 0,60</option>
+          <option value="full">Pleine production — Kc 0,90</option>
+          <option value="end">Fin de saison — Kc 0,70</option>
+          <option value="custom">Kc personnalisé</option>
+        </select>
+      </label>
+      <label id="customKcLabel">
+        Coefficient cultural Kc
+        <input id="kc" type="number" min="0" max="2" step="0.05" required>
+      </label>
+      <label>
+        Efficacité de la pluie
+        <input id="rainEfficiency" type="number" min="0" max="1" step="0.05" required>
+      </label>
+      <label>
+        Date du dernier arrosage
+        <input id="lastWatering" type="date" required>
+      </label>
       <button type="submit" class="secondary-button">Enregistrer</button>
     </form>
   </details>
@@ -57,6 +126,7 @@
   <p id="errorMessage" class="error" hidden></p>
   <p class="attribution">Données météo : Open-Meteo.</p>
 </main>
+
 <script src="./app.js" defer></script>
 </body>
 </html>

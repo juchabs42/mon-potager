@@ -1,22 +1,32 @@
-MON POTAGER — INSTALLATION GRATUITE SUR GITHUB PAGES
+MISE À JOUR VERS MON POTAGER V2
 
-1. Crée un dépôt public GitHub nommé mon-potager.
-2. Clique sur Add file > Upload files.
-3. Envoie index.html, style.css, app.js, manifest.webmanifest, service-worker.js et icon.svg.
-4. Valide avec Commit changes.
-5. Va dans Settings > Pages.
-6. Source : Deploy from a branch.
-7. Branche : main ; dossier : / (root).
-8. Enregistre puis ouvre l'adresse fournie par GitHub.
+1. Décompresse ce ZIP.
+2. Dans ton dépôt GitHub mon-potager, remplace :
+   - index.html
+   - style.css
+   - app.js
+   - manifest.webmanifest
+   - service-worker.js
+   - icon.svg
+3. Valide avec Commit changes.
+4. Attends une à deux minutes.
+5. Ouvre l'application puis appuie sur ↻.
+6. Si l'ancienne version reste affichée :
+   - ferme l'application ;
+   - ouvre le site dans Chrome ;
+   - actualise deux fois ;
+   - ou supprime puis réinstalle le raccourci.
 
-ANDROID
-Ouvre le site dans Chrome > menu ⋮ > Ajouter à l'écran d'accueil / Installer l'application.
+NOUVEAUTÉS
+- Indicateur vert, jaune, orange ou rouge
+- Conseil d'attendre si la pluie prévue couvre une grande partie du déficit
+- Cumul de pluie sur trois jours
+- Nombre de jours depuis le dernier arrosage
+- Icônes météo
+- Graphique ETP/pluie sur dix jours
+- Choix du stade de saison et Kc associé
+- Nouvelle tentative automatique après une erreur temporaire Open-Meteo
 
-PARAMÈTRES PRÉCHARGÉS
-Coordonnées : 43.793931, 4.014810
-Surface : 8 m²
-Débit : 8 L/min
-Kc : 0,9
-Efficacité pluie : 0,8
-
-La date du dernier arrosage est stockée uniquement sur le téléphone utilisé.
+IMPORTANT
+Le bouton « J'ai arrosé » remet la date au jour actuel.
+Les paramètres restent enregistrés sur le téléphone.

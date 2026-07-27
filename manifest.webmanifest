@@ -1,7 +1,7 @@
 {
   "name": "Mon Potager",
   "short_name": "Potager",
-  "description": "Conseil d'arrosage pour mon potager.",
+  "description": "Application de pilotage de l'arrosage du potager.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",
