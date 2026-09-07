@@ -35,7 +35,7 @@
 
   <section id="heroCard" class="hero card status-green">
     <div class="status-line">
-      <span id="statusDot" class="status-dot"></span>
+      <span class="status-dot"></span>
       <p class="label">Conseil global</p>
     </div>
     <h2 id="advice">Chargement…</h2>
@@ -81,14 +81,26 @@
     <div class="section-heading section-heading-stack-mobile">
       <div>
         <p class="label">Plan du potager</p>
-        <h2>Découper le jardin en zones</h2>
-        <p class="muted zone-help">Dessine un rectangle pour chaque culture. Ensuite, glisse la zone pour la déplacer ou utilise la poignée en bas à droite pour la redimensionner.</p>
+        <h2>Mes cultures</h2>
+        <p class="muted zone-help">Dessine les différentes zones. Tu peux ensuite les déplacer et les redimensionner directement sur le plan.</p>
       </div>
       <div class="plan-actions">
         <button id="addZoneButton" type="button" class="secondary-button">✏️ Dessiner une zone</button>
         <button id="deleteZoneButton" type="button" class="ghost-button" disabled>🗑️ Supprimer la zone</button>
       </div>
     </div>
+
+    <form id="planForm" class="plan-size-form">
+      <label>
+        Largeur du plan (m)
+        <input id="gardenWidth" type="number" min="1" step="0.1" required>
+      </label>
+      <label>
+        Hauteur du plan (m)
+        <input id="gardenHeight" type="number" min="1" step="0.1" required>
+      </label>
+      <button type="submit" class="ghost-button">Mettre à jour le plan</button>
+    </form>
 
     <div class="plan-meta">
       <span id="planSizeText">Plan : —</span>
@@ -99,7 +111,7 @@
       <svg id="gardenSvg" class="garden-svg" viewBox="0 0 8 4" preserveAspectRatio="xMidYMid meet" aria-label="Plan du potager"></svg>
     </div>
 
-    <p class="muted zone-help">Le recouvrement entre zones est bloqué pour garder un plan propre.</p>
+    <p class="muted zone-help">Le recouvrement entre zones est bloqué. Sélectionne une zone sur le plan pour la modifier.</p>
   </section>
 
   <section class="card">
@@ -117,7 +129,7 @@
       <div class="mini-grid mini-grid-2">
         <label>
           Nom de la zone
-          <input id="zoneName" type="text" placeholder="Ex. Tomates sud" required>
+          <input id="zoneName" type="text" placeholder="Ex. Rang du fond" required>
         </label>
         <label>
           Culture
@@ -142,26 +154,7 @@
         <input id="zoneCustomCrop" type="text" placeholder="Ex. Concombres">
       </label>
 
-      <div class="mini-grid">
-        <label>
-          X (m)
-          <input id="zoneX" type="number" min="0" step="0.1" required>
-        </label>
-        <label>
-          Y (m)
-          <input id="zoneY" type="number" min="0" step="0.1" required>
-        </label>
-        <label>
-          Largeur (m)
-          <input id="zoneWidth" type="number" min="0.1" step="0.1" required>
-        </label>
-        <label>
-          Hauteur (m)
-          <input id="zoneHeight" type="number" min="0.1" step="0.1" required>
-        </label>
-      </div>
-
-      <div class="mini-grid">
+      <div class="mini-grid mini-grid-3">
         <label>
           Débit d’arrosage (L/min)
           <input id="zoneFlow" type="number" min="0.1" step="0.1" required>
@@ -187,9 +180,9 @@
 
       <div class="form-actions">
         <button type="submit" class="secondary-button">Enregistrer la zone</button>
-        <button id="markZoneWateredButton" type="button" class="primary-button inline-button">💧 J’ai arrosé cette zone</button>
       </div>
     </form>
+    <p id="noZoneMessage" class="muted" hidden>Ajoute ou sélectionne une zone sur le plan.</p>
   </section>
 
   <section class="card">
@@ -202,86 +195,35 @@
     <div id="zonesList" class="zones-list"></div>
   </section>
 
-  <section class="card">
-    <div class="section-heading">
-      <div>
-        <p class="label">Évolution récente</p>
-        <h2>ETP et pluie</h2>
-      </div>
-      <span class="legend"><i class="bar etp"></i>ETP <i class="bar rain"></i>Pluie</span>
-    </div>
-    <canvas id="weatherChart" height="230"></canvas>
-  </section>
-
-  <section class="card">
-    <div class="section-heading">
+  <section class="card weather-card">
+    <div class="section-heading section-heading-stack-mobile">
       <div>
         <p class="label">Météo</p>
-        <h2>7 prochains jours</h2>
+        <h2>Consulter une date</h2>
+        <p class="muted">Historique récent et prévisions jusqu’à 15 jours.</p>
+      </div>
+      <div class="weather-date-control">
+        <button id="weatherPrevButton" type="button" class="date-nav-button" aria-label="Jour précédent">‹</button>
+        <input id="weatherDate" type="date" aria-label="Date météo">
+        <button id="weatherNextButton" type="button" class="date-nav-button" aria-label="Jour suivant">›</button>
       </div>
     </div>
-    <div id="forecast" class="forecast-list"></div>
+
+    <div id="weatherDayCard" class="weather-day-card">
+      <div class="weather-day-main">
+        <span id="weatherDayIcon" class="weather-big-icon">🌤️</span>
+        <div>
+          <span id="weatherDayType" class="weather-type">—</span>
+          <h3 id="weatherDayLabel">—</h3>
+        </div>
+      </div>
+      <div class="weather-day-metrics">
+        <div><span>Températures</span><strong id="weatherTemp">—</strong></div>
+        <div><span>Pluie</span><strong id="weatherRain">—</strong></div>
+        <div><span>ETP</span><strong id="weatherEtp">—</strong></div>
+      </div>
+    </div>
   </section>
-
-  <details class="card settings-card">
-    <summary>⚙️ Paramètres généraux</summary>
-    <form id="settingsForm">
-      <label>
-        Latitude
-        <input id="latitude" type="number" min="-90" max="90" step="0.000001" required>
-      </label>
-      <label>
-        Longitude
-        <input id="longitude" type="number" min="-180" max="180" step="0.000001" required>
-      </label>
-      <button id="useLocationButton" type="button" class="secondary-button">📍 Utiliser ma position actuelle</button>
-      <p id="locationStatus" class="muted"></p>
-
-      <div class="mini-grid mini-grid-2">
-        <label>
-          Largeur du potager (m)
-          <input id="gardenWidth" type="number" min="1" step="0.1" required>
-        </label>
-        <label>
-          Hauteur du potager (m)
-          <input id="gardenHeight" type="number" min="1" step="0.1" required>
-        </label>
-      </div>
-
-      <label>
-        Efficacité de la pluie
-        <input id="rainEfficiency" type="number" min="0" max="1" step="0.05" required>
-      </label>
-
-      <p class="muted settings-note">Ces valeurs servent de base lors de la création d’une nouvelle zone.</p>
-
-      <div class="mini-grid">
-        <label>
-          Débit par défaut (L/min)
-          <input id="defaultFlow" type="number" min="0.1" step="0.1" required>
-        </label>
-        <label>
-          Mode Kc par défaut
-          <select id="defaultSeasonMode">
-            <option value="start">Début de saison — Kc 0,60</option>
-            <option value="full">Pleine production — Kc 0,90</option>
-            <option value="end">Fin de saison — Kc 0,70</option>
-            <option value="custom">Kc personnalisé</option>
-          </select>
-        </label>
-        <label id="defaultCustomKcLabel">
-          Kc par défaut
-          <input id="defaultKc" type="number" min="0" max="2" step="0.05" required>
-        </label>
-        <label>
-          Dernier arrosage par défaut
-          <input id="defaultLastWatering" type="date" required>
-        </label>
-      </div>
-
-      <button type="submit" class="secondary-button">Enregistrer</button>
-    </form>
-  </details>
 
   <p id="errorMessage" class="error" hidden></p>
   <p class="attribution">Données météo : Open-Meteo.</p>

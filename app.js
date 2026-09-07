@@ -1,19 +1,19 @@
 const SEASON_KC={start:.6,full:.9,end:.7};
-const STORAGE_KEY="monPotagerSettingsV4";
-const LEGACY_KEYS=["monPotagerSettingsV3","monPotagerSettingsV2"];
+const STORAGE_KEY="monPotagerSettingsV5";
+const LEGACY_KEYS=["monPotagerSettingsV4","monPotagerSettingsV3","monPotagerSettingsV2"];
 
 const CROP_PRESETS={
   tomates:{label:"Tomates",kc:1.05,color:"#e8a09a"},
   salades:{label:"Salades",kc:0.75,color:"#9dd8a7"},
   courgettes:{label:"Courgettes",kc:0.95,color:"#f0d37b"},
-  carottes:{label:"Carottes",kc:0.7,color:"#efb07d"},
+  carottes:{label:"Carottes",kc:0.70,color:"#efb07d"},
   haricots:{label:"Haricots",kc:0.85,color:"#93c8a8"},
-  "pommes-de-terre":{label:"Pommes de terre",kc:1,color:"#c9b08d"},
-  poivrons:{label:"Poivrons",kc:0.9,color:"#e4a178"},
+  "pommes-de-terre":{label:"Pommes de terre",kc:1.00,color:"#c9b08d"},
+  poivrons:{label:"Poivrons",kc:0.90,color:"#e4a178"},
   aubergines:{label:"Aubergines",kc:0.95,color:"#bca4d9"},
-  fraisiers:{label:"Fraisiers",kc:0.8,color:"#ef9ca7"},
+  fraisiers:{label:"Fraisiers",kc:0.80,color:"#ef9ca7"},
   aromatiques:{label:"Aromatiques",kc:0.55,color:"#97d7c6"},
-  autre:{label:"Autre culture",kc:0.9,color:"#c4d8c7"}
+  autre:{label:"Autre culture",kc:0.90,color:"#c4d8c7"}
 };
 
 const DEFAULTS={
@@ -31,6 +31,7 @@ const DEFAULTS={
 
 const STATUS_COLORS={green:"#2b8148",yellow:"#b78500",orange:"#d66f1f",red:"#b13131"};
 let weatherRows=[];
+let weatherSelectedDate=null;
 let deferredInstallPrompt=null;
 let selectedZoneId=null;
 let drawMode=false;
@@ -41,48 +42,55 @@ document.addEventListener("DOMContentLoaded",()=>{
   cacheDom();
   bindEvents();
   setupInstallPrompt();
-  ensureInitialState();
-  loadSettingsIntoForm();
+  initializeState();
+  loadPlanIntoForm();
+  loadSelectedZoneIntoForm();
   refresh();
   registerServiceWorker();
 });
 
 function cacheDom(){
   [
-    "refreshButton","settingsForm","useLocationButton","installButton","installCard",
-    "defaultSeasonMode","defaultCustomKcLabel","defaultKc","heroCard","advice","rainAdvice",
-    "volume","duration","zonesSummary","updatedAt","etpTotal","rainTotal","zoneCount",
-    "gardenSurface","forecast","weatherChart","errorMessage","locationStatus","gardenSvg",
-    "planSizeText","drawModeText","addZoneButton","deleteZoneButton","zonesList","zoneForm",
-    "selectedZoneSurface","zoneId","zoneName","zoneCropKey","zoneCustomCropLabel","zoneCustomCrop",
-    "zoneX","zoneY","zoneWidth","zoneHeight","zoneFlow","zoneSeasonMode","zoneCustomKcLabel",
-    "zoneKc","zoneLastWatering","markZoneWateredButton"
+    "refreshButton","installButton","installCard","heroCard","advice","rainAdvice","volume",
+    "duration","zonesSummary","updatedAt","etpTotal","rainTotal","zoneCount","gardenSurface",
+    "errorMessage","gardenSvg","planSizeText","drawModeText","addZoneButton","deleteZoneButton",
+    "planForm","gardenWidth","gardenHeight","zonesList","zoneForm","noZoneMessage","selectedZoneSurface",
+    "zoneId","zoneName","zoneCropKey","zoneCustomCropLabel","zoneCustomCrop","zoneFlow","zoneSeasonMode",
+    "zoneCustomKcLabel","zoneKc","zoneLastWatering","weatherDate","weatherPrevButton","weatherNextButton",
+    "weatherDayIcon","weatherDayType","weatherDayLabel","weatherTemp","weatherRain","weatherEtp"
   ].forEach(id=>dom[id]=document.getElementById(id));
 }
 
 function bindEvents(){
   dom.refreshButton.addEventListener("click",refresh);
-  dom.settingsForm.addEventListener("submit",saveSettings);
-  dom.useLocationButton.addEventListener("click",useCurrentLocation);
   dom.installButton.addEventListener("click",installApp);
-  dom.defaultSeasonMode.addEventListener("change",()=>toggleKcField(dom.defaultSeasonMode,dom.defaultCustomKcLabel));
-  dom.zoneSeasonMode.addEventListener("change",()=>toggleKcField(dom.zoneSeasonMode,dom.zoneCustomKcLabel));
-  dom.zoneCropKey.addEventListener("change",handleCropPresetChange);
   dom.addZoneButton.addEventListener("click",toggleDrawMode);
   dom.deleteZoneButton.addEventListener("click",deleteSelectedZone);
+  dom.planForm.addEventListener("submit",savePlanDimensions);
   dom.zoneForm.addEventListener("submit",saveZone);
-  dom.markZoneWateredButton.addEventListener("click",()=>markZoneWatered(selectedZoneId));
+  dom.zoneCropKey.addEventListener("change",handleCropPresetChange);
+  dom.zoneSeasonMode.addEventListener("change",()=>toggleKcField(dom.zoneSeasonMode,dom.zoneCustomKcLabel));
   dom.zonesList.addEventListener("click",handleZoneListClick);
-  window.addEventListener("resize",()=>weatherRows.length&&renderChart());
+  dom.weatherDate.addEventListener("change",()=>{
+    weatherSelectedDate=dom.weatherDate.value;
+    renderWeatherDay();
+  });
+  dom.weatherPrevButton.addEventListener("click",()=>moveWeatherDate(-1));
+  dom.weatherNextButton.addEventListener("click",()=>moveWeatherDate(1));
   bindPlanEvents();
 }
 
 function bindPlanEvents(){
-  const svg=dom.gardenSvg;
-  svg.addEventListener("pointerdown",onPlanPointerDown);
-  svg.addEventListener("pointermove",onPlanPointerMove);
-  svg.addEventListener("pointerup",onPlanPointerUp);
-  svg.addEventListener("pointercancel",cancelInteraction);
+  dom.gardenSvg.addEventListener("pointerdown",onPlanPointerDown);
+  dom.gardenSvg.addEventListener("pointermove",onPlanPointerMove);
+  dom.gardenSvg.addEventListener("pointerup",onPlanPointerUp);
+  dom.gardenSvg.addEventListener("pointercancel",cancelInteraction);
+}
+
+function initializeState(){
+  const state=settings();
+  if(state.zones.length)selectedZoneId=state.zones[0].id;
+  else selectedZoneId=null;
 }
 
 function onPlanPointerDown(event){
@@ -103,15 +111,13 @@ function onPlanPointerDown(event){
   if(!zone)return;
 
   selectedZoneId=zoneId;
-  const draft={x:zone.x,y:zone.y,width:zone.width,height:zone.height};
-  const action=actionTarget.getAttribute("data-action");
   interaction={
-    type:action==="resize"?"resize":"move",
+    type:actionTarget.getAttribute("data-action")==="resize"?"resize":"move",
     pointerId:event.pointerId,
     zoneId,
     start:point,
     startRect:{x:zone.x,y:zone.y,width:zone.width,height:zone.height},
-    draftRect:draft,
+    draftRect:{x:zone.x,y:zone.y,width:zone.width,height:zone.height},
     isValid:true
   };
   dom.gardenSvg.setPointerCapture(event.pointerId);
@@ -126,9 +132,10 @@ function onPlanPointerMove(event){
 
   if(interaction.type==="draw"){
     interaction.current=point;
-    const rect=normalizedRect(interaction.start.x,interaction.start.y,point.x,point.y,state.gardenWidth,state.gardenHeight);
-    interaction.previewRect=rect;
-    interaction.isValid=rect.width>=.3&&rect.height>=.3&&!hasOverlap(rect,null,state.zones);
+    interaction.previewRect=normalizedRect(
+      interaction.start.x,interaction.start.y,point.x,point.y,state.gardenWidth,state.gardenHeight
+    );
+    interaction.isValid=interaction.previewRect.width>=.3&&interaction.previewRect.height>=.3&&!hasOverlap(interaction.previewRect,null,state.zones);
     renderGardenPlan(stateMetricsFromCurrent());
     return;
   }
@@ -136,13 +143,12 @@ function onPlanPointerMove(event){
   if(interaction.type==="move"){
     const dx=point.x-interaction.start.x;
     const dy=point.y-interaction.start.y;
-    const rect={
+    interaction.draftRect=roundRect({
       x:clamp(interaction.startRect.x+dx,0,state.gardenWidth-interaction.startRect.width,0),
       y:clamp(interaction.startRect.y+dy,0,state.gardenHeight-interaction.startRect.height,0),
       width:interaction.startRect.width,
       height:interaction.startRect.height
-    };
-    interaction.draftRect=roundRect(rect);
+    });
     interaction.isValid=!hasOverlap(interaction.draftRect,interaction.zoneId,state.zones);
     renderGardenPlan(stateMetricsFromCurrent());
     return;
@@ -150,13 +156,11 @@ function onPlanPointerMove(event){
 
   if(interaction.type==="resize"){
     const minSize=.4;
-    const width=clamp(point.x-interaction.startRect.x,minSize,state.gardenWidth-interaction.startRect.x,minSize);
-    const height=clamp(point.y-interaction.startRect.y,minSize,state.gardenHeight-interaction.startRect.y,minSize);
     interaction.draftRect=roundRect({
       x:interaction.startRect.x,
       y:interaction.startRect.y,
-      width,
-      height
+      width:clamp(point.x-interaction.startRect.x,minSize,state.gardenWidth-interaction.startRect.x,minSize),
+      height:clamp(point.y-interaction.startRect.y,minSize,state.gardenHeight-interaction.startRect.y,minSize)
     });
     interaction.isValid=!hasOverlap(interaction.draftRect,interaction.zoneId,state.zones);
     renderGardenPlan(stateMetricsFromCurrent());
@@ -168,7 +172,9 @@ function onPlanPointerUp(event){
   const state=settings();
 
   if(interaction.type==="draw"){
-    const rect=interaction.previewRect||normalizedRect(interaction.start.x,interaction.start.y,interaction.current.x,interaction.current.y,state.gardenWidth,state.gardenHeight);
+    const rect=interaction.previewRect||normalizedRect(
+      interaction.start.x,interaction.start.y,interaction.current.x,interaction.current.y,state.gardenWidth,state.gardenHeight
+    );
     if(rect.width<.3||rect.height<.3){
       interaction=null;
       renderGardenPlan(stateMetricsFromCurrent());
@@ -193,10 +199,7 @@ function onPlanPointerUp(event){
   }
 
   const index=state.zones.findIndex(zone=>String(zone.id)===String(interaction.zoneId));
-  if(index<0){
-    interaction=null;
-    return;
-  }
+  if(index<0){interaction=null;return;}
 
   if(!interaction.isValid){
     interaction=null;
@@ -220,32 +223,10 @@ function cancelInteraction(){
   renderGardenPlan(stateMetricsFromCurrent());
 }
 
-function ensureInitialState(){
-  const state=settings();
-  if(!state.zones.length){
-    const zone=normalizeZone({
-      id:createId(),
-      name:"Potager",
-      cropKey:"autre",
-      cropCustom:"Culture principale",
-      x:0,
-      y:0,
-      width:state.gardenWidth,
-      height:state.gardenHeight,
-      flow:state.defaultFlow,
-      seasonMode:state.defaultSeasonMode,
-      kc:state.defaultKc,
-      lastWatering:state.defaultLastWatering
-    },state);
-    state.zones=[zone];
-    persistSettings(state);
-  }
-  selectedZoneId=state.zones[0]?.id??null;
-}
-
 function settings(){
   const current=readStorage(STORAGE_KEY);
   if(current)return normalizeState(current);
+
   for(const key of LEGACY_KEYS){
     const legacy=readStorage(key);
     if(legacy){
@@ -265,13 +246,12 @@ function readStorage(key){
 }
 
 function migrateLegacy(data){
-  if(Array.isArray(data.zones)){
-    return {...DEFAULTS,...data};
-  }
+  if(Array.isArray(data.zones))return {...DEFAULTS,...data};
   const surface=Math.max(.5,num(data.surface)||8);
   const width=round(Math.max(2,Math.sqrt(surface*2)),1);
   const height=round(surface/width,1);
   return {
+    ...DEFAULTS,
     latitude:num(data.latitude)||DEFAULTS.latitude,
     longitude:num(data.longitude)||DEFAULTS.longitude,
     rainEfficiency:num(data.rainEfficiency)||DEFAULTS.rainEfficiency,
@@ -286,10 +266,7 @@ function migrateLegacy(data){
       name:"Potager",
       cropKey:"autre",
       cropCustom:data.crop||"Culture principale",
-      x:0,
-      y:0,
-      width,
-      height,
+      x:0,y:0,width,height,
       flow:num(data.flow)||DEFAULTS.defaultFlow,
       kc:num(data.kc)||DEFAULTS.defaultKc,
       seasonMode:data.seasonMode||DEFAULTS.defaultSeasonMode,
@@ -319,16 +296,14 @@ function normalizeZone(zone,state){
   const height=clamp(Math.max(.1,num(zone.height)||1),.1,state.gardenHeight,state.gardenHeight);
   const x=clamp(num(zone.x),0,Math.max(0,state.gardenWidth-width),0);
   const y=clamp(num(zone.y),0,Math.max(0,state.gardenHeight-height),0);
-  const guessedKey=guessCropKey(zone.cropKey||zone.crop||zone.cropCustom);
-  const cropKey=guessedKey||"autre";
-  const cropCustom=zone.cropCustom || (cropKey==="autre"?(zone.crop||"Culture"):
-    CROP_PRESETS[cropKey].label);
+  const cropKey=guessCropKey(zone.cropKey||zone.crop||zone.cropCustom)||"autre";
+  const cropCustom=zone.cropCustom||(cropKey==="autre"?(zone.crop||"Culture"):CROP_PRESETS[cropKey].label);
   return {
     id:String(zone.id||createId()),
     name:(zone.name||"Nouvelle zone").trim(),
     cropKey,
     cropCustom:(cropCustom||"").trim(),
-    x, y, width, height,
+    x,y,width,height,
     flow:Math.max(.1,num(zone.flow)||state.defaultFlow),
     kc:Math.max(0,num(zone.kc)||state.defaultKc),
     seasonMode:zone.seasonMode||state.defaultSeasonMode,
@@ -340,48 +315,35 @@ function persistSettings(state){
   localStorage.setItem(STORAGE_KEY,JSON.stringify(normalizeState(state)));
 }
 
-function loadSettingsIntoForm(){
+function loadPlanIntoForm(){
   const state=settings();
-  setValue("latitude",state.latitude);
-  setValue("longitude",state.longitude);
-  setValue("gardenWidth",state.gardenWidth);
-  setValue("gardenHeight",state.gardenHeight);
-  setValue("rainEfficiency",state.rainEfficiency);
-  setValue("defaultFlow",state.defaultFlow);
-  setValue("defaultSeasonMode",state.defaultSeasonMode);
-  setValue("defaultKc",state.defaultKc);
-  setValue("defaultLastWatering",state.defaultLastWatering);
-  toggleKcField(dom.defaultSeasonMode,dom.defaultCustomKcLabel);
+  dom.gardenWidth.value=state.gardenWidth;
+  dom.gardenHeight.value=state.gardenHeight;
   setDrawButtonLabel();
-  loadSelectedZoneIntoForm();
 }
 
 function loadSelectedZoneIntoForm(){
   const state=settings();
-  let zone=getSelectedZone(state);
-  if(!zone&&state.zones.length){
-    zone=state.zones[0];
-    selectedZoneId=zone.id;
-  }
+  const zone=getSelectedZone(state);
   dom.deleteZoneButton.disabled=!zone;
-  dom.markZoneWateredButton.disabled=!zone;
+
   if(!zone){
-    dom.zoneForm.reset();
+    dom.zoneForm.hidden=true;
+    dom.noZoneMessage.hidden=false;
     dom.selectedZoneSurface.textContent="Aucune zone sélectionnée";
     return;
   }
-  setValue("zoneId",zone.id);
-  setValue("zoneName",zone.name);
-  setValue("zoneCropKey",zone.cropKey);
-  setValue("zoneCustomCrop",zone.cropKey==="autre"?zone.cropCustom:"");
-  setValue("zoneX",round(zone.x,1));
-  setValue("zoneY",round(zone.y,1));
-  setValue("zoneWidth",round(zone.width,1));
-  setValue("zoneHeight",round(zone.height,1));
-  setValue("zoneFlow",zone.flow);
-  setValue("zoneSeasonMode",zone.seasonMode);
-  setValue("zoneKc",zone.kc);
-  setValue("zoneLastWatering",zone.lastWatering);
+
+  dom.zoneForm.hidden=false;
+  dom.noZoneMessage.hidden=true;
+  dom.zoneId.value=zone.id;
+  dom.zoneName.value=zone.name;
+  dom.zoneCropKey.value=zone.cropKey;
+  dom.zoneCustomCrop.value=zone.cropKey==="autre"?zone.cropCustom:"";
+  dom.zoneFlow.value=zone.flow;
+  dom.zoneSeasonMode.value=zone.seasonMode;
+  dom.zoneKc.value=zone.kc;
+  dom.zoneLastWatering.value=zone.lastWatering;
   toggleKcField(dom.zoneSeasonMode,dom.zoneCustomKcLabel);
   toggleCustomCropField();
   dom.selectedZoneSurface.textContent=`Surface : ${round(zone.width*zone.height,1)} m²`;
@@ -392,19 +354,16 @@ function handleCropPresetChange(){
   toggleCustomCropField();
   if(key!=="autre"){
     const preset=CROP_PRESETS[key];
-    setValue("zoneKc",preset.kc);
-    setValue("zoneSeasonMode","custom");
+    dom.zoneKc.value=preset.kc;
+    dom.zoneSeasonMode.value="custom";
     toggleKcField(dom.zoneSeasonMode,dom.zoneCustomKcLabel);
     const currentName=dom.zoneName.value.trim();
-    if(!currentName||currentName.toLowerCase().startsWith("zone ")||currentName==="Potager"){
-      setValue("zoneName",preset.label);
-    }
+    if(!currentName||currentName.toLowerCase().startsWith("zone ")||currentName==="Potager")dom.zoneName.value=preset.label;
   }
 }
 
 function toggleCustomCropField(){
-  const isCustom=dom.zoneCropKey.value==="autre";
-  dom.zoneCustomCropLabel.style.display=isCustom?"grid":"none";
+  dom.zoneCustomCropLabel.style.display=dom.zoneCropKey.value==="autre"?"grid":"none";
 }
 
 function toggleKcField(select,label){
@@ -422,7 +381,7 @@ async function refresh(){
       longitude:state.longitude,
       daily:["et0_fao_evapotranspiration","precipitation_sum","temperature_2m_min","temperature_2m_max","weather_code"].join(","),
       timezone:"Europe/Paris",
-      past_days:"15",
+      past_days:"30",
       forecast_days:"16"
     }).toString();
 
@@ -432,6 +391,7 @@ async function refresh(){
       response=await fetch(url,{cache:"no-store"});
     }
     if(!response.ok)throw new Error(`Open-Meteo répond ${response.status}.`);
+
     const data=await response.json();
     if(!data.daily?.time)throw new Error("Données météo absentes.");
 
@@ -443,12 +403,28 @@ async function refresh(){
       tmax:num(data.daily.temperature_2m_max[index]),
       code:num(data.daily.weather_code[index])
     }));
+
+    setupWeatherDateSelector();
     render();
   }catch(error){
     showError("Impossible d’actualiser la météo. "+error.message);
   }finally{
     setLoading(false);
   }
+}
+
+function setupWeatherDateSelector(){
+  if(!weatherRows.length)return;
+  const first=weatherRows[0].date;
+  const last=weatherRows[weatherRows.length-1].date;
+  const today=localDateString(new Date());
+  if(!weatherSelectedDate||weatherSelectedDate<first||weatherSelectedDate>last){
+    weatherSelectedDate=weatherRows.some(row=>row.date===today)?today:last;
+  }
+  dom.weatherDate.min=first;
+  dom.weatherDate.max=last;
+  dom.weatherDate.value=weatherSelectedDate;
+  updateWeatherNavButtons();
 }
 
 function render(){
@@ -464,24 +440,23 @@ function render(){
   const totalSurface=sum(state.zones.map(zone=>zone.width*zone.height));
   const globalStatus=computeGlobalStatus(zoneMetrics,totalVolume);
 
-  applyStatus(globalStatus);
-  txt(dom.advice,globalStatus.title);
-  txt(dom.rainAdvice,globalStatus.message);
-  txt(dom.volume,`${round(totalVolume,1)} L`);
-  txt(dom.duration,formatMinutes(totalMinutes));
-  txt(dom.zonesSummary,`${zonesToWater} zone${zonesToWater>1?"s":""} à arroser sur ${state.zones.length}`);
-  txt(dom.updatedAt,`Mis à jour à ${new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}`);
-  txt(dom.etpTotal,`${round(etp7,2)} mm`);
-  txt(dom.rainTotal,`${round(rain7,2)} mm`);
-  txt(dom.zoneCount,String(zonesToWater));
-  txt(dom.gardenSurface,`${round(totalSurface,1)} m²`);
-  txt(dom.planSizeText,`Plan : ${round(state.gardenWidth,1)} m × ${round(state.gardenHeight,1)} m`);
-  txt(dom.drawModeText,drawMode?"Mode dessin actif":"Mode normal");
+  dom.heroCard.className=`hero card status-${globalStatus.level}`;
+  dom.advice.textContent=globalStatus.title;
+  dom.rainAdvice.textContent=globalStatus.message;
+  dom.volume.textContent=`${round(totalVolume,1)} L`;
+  dom.duration.textContent=formatMinutes(totalMinutes);
+  dom.zonesSummary.textContent=`${zonesToWater} zone${zonesToWater>1?"s":""} à arroser sur ${state.zones.length}`;
+  dom.updatedAt.textContent=`Mis à jour à ${new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}`;
+  dom.etpTotal.textContent=`${round(etp7,2)} mm`;
+  dom.rainTotal.textContent=`${round(rain7,2)} mm`;
+  dom.zoneCount.textContent=String(zonesToWater);
+  dom.gardenSurface.textContent=`${round(totalSurface,1)} m²`;
+  dom.planSizeText.textContent=`Plan : ${round(state.gardenWidth,1)} m × ${round(state.gardenHeight,1)} m`;
+  dom.drawModeText.textContent=drawMode?"Mode dessin actif":"Mode normal";
 
-  renderForecast(today);
-  renderChart();
   renderGardenPlan(zoneMetrics);
   renderZonesList(zoneMetrics);
+  renderWeatherDay();
   loadSelectedZoneIntoForm();
 }
 
@@ -516,7 +491,7 @@ function computeStatus(dose,effectiveFutureRain,rain3){
 }
 
 function computeGlobalStatus(zoneMetrics,totalVolume){
-  if(!zoneMetrics.length)return {level:"green",title:"Ajoute une première zone",message:"Dessine ton potager pour obtenir un conseil d’arrosage."};
+  if(!zoneMetrics.length)return {level:"green",title:"Dessine ton potager",message:"Ajoute les différentes cultures sur le plan pour obtenir les conseils d’arrosage."};
   const counts=zoneMetrics.reduce((acc,item)=>{acc[item.status.level]=(acc[item.status.level]||0)+1;return acc;},{});
   if(totalVolume<=.05)return {level:"green",title:"Pas besoin d’arroser",message:"Aucune zone ne nécessite d’arrosage pour le moment."};
   if(counts.red)return {level:"red",title:"Arrosage prioritaire",message:`${counts.red} zone${counts.red>1?"s sont prioritaires":" est prioritaire"} aujourd’hui.`};
@@ -524,15 +499,10 @@ function computeGlobalStatus(zoneMetrics,totalVolume){
   return {level:"yellow",title:"Arrosage léger",message:"Quelques zones ont un petit déficit hydrique."};
 }
 
-function applyStatus(status){
-  dom.heroCard.className=`hero card status-${status.level}`;
-}
-
 function renderGardenPlan(zoneMetrics=[]){
   const state=settings();
   const metricsById=new Map(zoneMetrics.map(item=>[String(item.zone.id),item]));
-  const svg=dom.gardenSvg;
-  svg.setAttribute("viewBox",`0 0 ${state.gardenWidth} ${state.gardenHeight}`);
+  dom.gardenSvg.setAttribute("viewBox",`0 0 ${state.gardenWidth} ${state.gardenHeight}`);
 
   let lines="";
   for(let x=0;x<=Math.floor(state.gardenWidth);x++)lines+=`<line x1="${x}" y1="0" x2="${x}" y2="${state.gardenHeight}"></line>`;
@@ -542,18 +512,17 @@ function renderGardenPlan(zoneMetrics=[]){
 
   for(const zone of state.zones){
     const metric=metricsById.get(String(zone.id));
-    const preview=isInteractingZone(zone.id)?interaction.draftRect:null;
-    const rect=preview||zone;
+    const rect=isInteractingZone(zone.id)?interaction.draftRect:zone;
     const crop=getCropPreset(zone.cropKey);
     const statusColor=STATUS_COLORS[metric?.status.level||"green"];
     const selected=String(selectedZoneId)===String(zone.id);
-    const cropLabel=getCropLabel(zone);
-    const surface=round(rect.width*rect.height,1);
+    const cropLabel=truncateLabel(getCropLabel(zone),Math.max(8,Math.floor(rect.width*6)));
+    const liters=metric?`${round(metric.volume,1)} L`:"— L";
+
     html+=`<g data-zone-id="${zone.id}">
       <rect class="zone-rect${selected?" zone-selected":""}" data-zone-id="${zone.id}" data-action="move" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" fill="${crop.color}" stroke="${statusColor}"></rect>
-      <text class="zone-label" x="${rect.x+.14}" y="${rect.y+.30}">${escapeHtml(zone.name)}</text>
-      <text class="zone-sub" x="${rect.x+.14}" y="${rect.y+.54}">${escapeHtml(cropLabel)} · ${surface} m²</text>
-      <text class="zone-mini-badge" x="${rect.x+.14}" y="${rect.y+.78}" fill="${statusColor}">${escapeHtml(metric?.status.title||"")}</text>
+      <text class="zone-label" x="${rect.x+.14}" y="${rect.y+.34}">${escapeHtml(cropLabel)}</text>
+      <text class="zone-liters" x="${rect.x+.14}" y="${rect.y+.66}">${escapeHtml(liters)}</text>
       ${selected?`<circle class="zone-handle" data-zone-id="${zone.id}" data-action="resize" cx="${rect.x+rect.width}" cy="${rect.y+rect.height}" r="0.14"></circle>`:""}
     </g>`;
   }
@@ -562,7 +531,7 @@ function renderGardenPlan(zoneMetrics=[]){
     const rect=interaction.previewRect;
     html+=`<rect class="zone-preview${interaction.isValid?"":" invalid"}" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}"></rect>`;
   }
-  svg.innerHTML=html;
+  dom.gardenSvg.innerHTML=html;
 }
 
 function renderZonesList(zoneMetrics){
@@ -570,17 +539,16 @@ function renderZonesList(zoneMetrics){
     dom.zonesList.innerHTML="<p class='muted'>Dessine une zone pour commencer.</p>";
     return;
   }
+
   dom.zonesList.innerHTML=zoneMetrics.map(item=>{
-    const crop=getCropPreset(item.zone.cropKey);
     const cropLabel=getCropLabel(item.zone);
     return `<article class="zone-item">
-      <h3>${escapeHtml(item.zone.name)}</h3>
-      <p class="zone-crop">${escapeHtml(cropLabel)}</p>
+      <h3>${escapeHtml(cropLabel)}</h3>
+      <p class="zone-crop">${escapeHtml(item.zone.name)}</p>
       <div class="zone-badges">
         <span class="badge badge-${item.status.level}">${item.status.title}</span>
         <span class="badge">${round(item.surface,1)} m²</span>
         <span class="badge">Kc ${round(activeKc(item.zone),2)}</span>
-        <span class="badge" style="background:${crop.color};color:#163020">Couleur culture</span>
       </div>
       <div class="zone-stats">
         <div><span class="metric-label">À apporter</span><strong>${round(item.volume,1)} L</strong></div>
@@ -590,144 +558,110 @@ function renderZonesList(zoneMetrics){
       </div>
       <p class="muted">${item.status.message}</p>
       <div class="zone-actions">
-        <button class="secondary-button" type="button" data-action="select" data-zone-id="${item.zone.id}">Sélectionner</button>
         <button class="ghost-button" type="button" data-action="watered" data-zone-id="${item.zone.id}">💧 J’ai arrosé</button>
       </div>
     </article>`;
   }).join("");
 }
 
-function renderForecast(today){
-  dom.forecast.innerHTML="";
-  weatherRows.filter(row=>row.date>=today).slice(0,7).forEach(row=>{
-    const element=document.createElement("div");
-    element.className="forecast-row";
-    element.innerHTML=`
-      <strong>${dayLabel(row.date)}</strong>
-      <span class="weather-icon">${weatherIcon(row.code)}</span>
-      <span>ETP ${round(row.etp,1)}</span>
-      <span>🌧 ${round(row.rain,1)}</span>
-      <span>${round(row.tmin,0)}° / ${round(row.tmax,0)}°</span>`;
-    dom.forecast.appendChild(element);
-  });
-}
-
-function renderChart(){
-  const canvas=dom.weatherChart;
-  const ctx=canvas.getContext("2d");
-  const ratio=window.devicePixelRatio||1;
-  const width=canvas.clientWidth||650;
-  const height=230;
-  canvas.width=width*ratio;
-  canvas.height=height*ratio;
-  ctx.setTransform(ratio,0,0,ratio,0,0);
-  ctx.clearRect(0,0,width,height);
-
-  const today=localDateString(new Date());
-  const rows=weatherRows.filter(row=>row.date<=today).slice(-10);
-  if(!rows.length)return;
-
-  const pad={left:30,right:10,top:16,bottom:35};
-  const chartW=width-pad.left-pad.right;
-  const chartH=height-pad.top-pad.bottom;
-  const max=Math.max(1,...rows.flatMap(row=>[row.etp,row.rain]));
-  const groupW=chartW/rows.length;
-  const barW=Math.min(16,groupW*.28);
-
-  ctx.strokeStyle="#dbe5dd";
-  ctx.lineWidth=1;
-  for(let i=0;i<=4;i++){
-    const y=pad.top+chartH*i/4;
-    ctx.beginPath();
-    ctx.moveTo(pad.left,y);
-    ctx.lineTo(width-pad.right,y);
-    ctx.stroke();
+function renderWeatherDay(){
+  if(!weatherRows.length){
+    dom.weatherDayType.textContent="—";
+    dom.weatherDayLabel.textContent="Données indisponibles";
+    dom.weatherTemp.textContent="—";
+    dom.weatherRain.textContent="—";
+    dom.weatherEtp.textContent="—";
+    return;
   }
 
-  rows.forEach((row,index)=>{
-    const x=pad.left+index*groupW+groupW/2;
-    drawBar(ctx,x-barW-2,row.etp,"#e6a04b",pad,chartH,max,barW);
-    drawBar(ctx,x+2,row.rain,"#4e9ad1",pad,chartH,max,barW);
-    ctx.fillStyle="#68766c";
-    ctx.font="10px system-ui";
-    ctx.textAlign="center";
-    ctx.fillText(shortDay(row.date),x,height-12);
-  });
+  if(!weatherSelectedDate)weatherSelectedDate=localDateString(new Date());
+  const row=weatherRows.find(item=>item.date===weatherSelectedDate)||weatherRows[weatherRows.length-1];
+  weatherSelectedDate=row.date;
+  dom.weatherDate.value=row.date;
+
+  const today=localDateString(new Date());
+  const type=row.date<today?"Historique":row.date===today?"Aujourd’hui":"Prévision";
+  dom.weatherDayIcon.textContent=weatherIcon(row.code);
+  dom.weatherDayType.textContent=type;
+  dom.weatherDayLabel.textContent=formatLongDate(row.date);
+  dom.weatherTemp.textContent=`${round(row.tmin,0)}° / ${round(row.tmax,0)}°`;
+  dom.weatherRain.textContent=`${round(row.rain,1)} mm`;
+  dom.weatherEtp.textContent=`${round(row.etp,1)} mm`;
+  updateWeatherNavButtons();
 }
 
-function drawBar(ctx,x,value,color,pad,chartH,max,barW){
-  const h=(value/max)*chartH;
-  ctx.fillStyle=color;
-  ctx.fillRect(x,pad.top+chartH-h,barW,h);
+function moveWeatherDate(step){
+  if(!weatherRows.length)return;
+  const index=weatherRows.findIndex(row=>row.date===weatherSelectedDate);
+  const nextIndex=clamp(index+step,0,weatherRows.length-1,0);
+  weatherSelectedDate=weatherRows[nextIndex].date;
+  dom.weatherDate.value=weatherSelectedDate;
+  renderWeatherDay();
 }
 
-function saveSettings(event){
+function updateWeatherNavButtons(){
+  if(!weatherRows.length){
+    dom.weatherPrevButton.disabled=true;
+    dom.weatherNextButton.disabled=true;
+    return;
+  }
+  const index=weatherRows.findIndex(row=>row.date===weatherSelectedDate);
+  dom.weatherPrevButton.disabled=index<=0;
+  dom.weatherNextButton.disabled=index<0||index>=weatherRows.length-1;
+}
+
+function savePlanDimensions(event){
   event.preventDefault();
   const state=settings();
-  state.latitude=num(val("latitude"));
-  state.longitude=num(val("longitude"));
-  state.gardenWidth=Math.max(1,num(val("gardenWidth")));
-  state.gardenHeight=Math.max(1,num(val("gardenHeight")));
-  state.rainEfficiency=clamp(num(val("rainEfficiency")),0,1,DEFAULTS.rainEfficiency);
-  state.defaultFlow=Math.max(.1,num(val("defaultFlow")));
-  state.defaultSeasonMode=val("defaultSeasonMode");
-  state.defaultKc=Math.max(0,num(val("defaultKc")));
-  state.defaultLastWatering=val("defaultLastWatering");
-  state.zones=state.zones.map(zone=>normalizeZone(zone,state));
+  const width=Math.max(1,num(dom.gardenWidth.value));
+  const height=Math.max(1,num(dom.gardenHeight.value));
+
+  const outOfBounds=state.zones.some(zone=>zone.x+zone.width>width+.0001||zone.y+zone.height>height+.0001);
+  if(outOfBounds){
+    showError("Impossible de réduire le plan : au moins une zone dépasserait. Déplace ou redimensionne d’abord les zones concernées.");
+    loadPlanIntoForm();
+    return;
+  }
+
+  state.gardenWidth=width;
+  state.gardenHeight=height;
   persistSettings(state);
+  hideError();
   render();
 }
 
 function saveZone(event){
   event.preventDefault();
   const state=settings();
-  const index=state.zones.findIndex(zone=>String(zone.id)===String(val("zoneId")));
+  const index=state.zones.findIndex(zone=>String(zone.id)===String(dom.zoneId.value));
   if(index<0)return;
 
-  const width=Math.max(.1,num(val("zoneWidth")));
-  const height=Math.max(.1,num(val("zoneHeight")));
-  const x=clamp(num(val("zoneX")),0,Math.max(0,state.gardenWidth-width),0);
-  const y=clamp(num(val("zoneY")),0,Math.max(0,state.gardenHeight-height),0);
-  const cropKey=val("zoneCropKey");
+  const cropKey=dom.zoneCropKey.value;
   const zone={
     ...state.zones[index],
-    name:val("zoneName").trim()||"Nouvelle zone",
+    name:dom.zoneName.value.trim()||"Zone",
     cropKey,
-    cropCustom:cropKey==="autre"?(val("zoneCustomCrop").trim()||"Autre culture"):CROP_PRESETS[cropKey].label,
-    x,y,width,height,
-    flow:Math.max(.1,num(val("zoneFlow"))),
-    seasonMode:val("zoneSeasonMode"),
-    kc:Math.max(0,num(val("zoneKc"))),
-    lastWatering:val("zoneLastWatering")
+    cropCustom:cropKey==="autre"?(dom.zoneCustomCrop.value.trim()||"Autre culture"):CROP_PRESETS[cropKey].label,
+    flow:Math.max(.1,num(dom.zoneFlow.value)),
+    seasonMode:dom.zoneSeasonMode.value,
+    kc:Math.max(0,num(dom.zoneKc.value)),
+    lastWatering:dom.zoneLastWatering.value
   };
 
-  if(hasOverlap(zone,zone.id,state.zones)){
-    showError("Enregistrement impossible : cette zone chevauche une autre zone.");
-    return;
-  }
-
   state.zones[index]=normalizeZone(zone,state);
-  selectedZoneId=state.zones[index].id;
   persistSettings(state);
+  selectedZoneId=state.zones[index].id;
   hideError();
   render();
 }
 
 function handleZoneListClick(event){
-  const button=event.target.closest("button[data-action]");
+  const button=event.target.closest("button[data-action='watered']");
   if(!button)return;
-  const zoneId=button.getAttribute("data-zone-id");
-  const action=button.getAttribute("data-action");
-  if(action==="select"){
-    selectedZoneId=zoneId;
-    render();
-    return;
-  }
-  if(action==="watered")markZoneWatered(zoneId);
+  markZoneWatered(button.getAttribute("data-zone-id"));
 }
 
 function markZoneWatered(zoneId){
-  if(!zoneId)return;
   const state=settings();
   const zone=state.zones.find(item=>String(item.id)===String(zoneId));
   if(!zone)return;
@@ -739,11 +673,14 @@ function markZoneWatered(zoneId){
 function deleteSelectedZone(){
   if(!selectedZoneId)return;
   const state=settings();
-  if(state.zones.length<=1){
-    showError("Il doit rester au moins une zone dans le potager.");
-    return;
-  }
-  state.zones=state.zones.filter(zone=>String(zone.id)!==String(selectedZoneId));
+  const zone=state.zones.find(item=>String(item.id)===String(selectedZoneId));
+  if(!zone)return;
+
+  const cropLabel=getCropLabel(zone);
+  const confirmed=window.confirm(`Supprimer la zone « ${cropLabel} » ? Cette action supprimera son suivi d’arrosage.`);
+  if(!confirmed)return;
+
+  state.zones=state.zones.filter(item=>String(item.id)!==String(selectedZoneId));
   selectedZoneId=state.zones[0]?.id??null;
   persistSettings(state);
   hideError();
@@ -754,7 +691,7 @@ function toggleDrawMode(){
   drawMode=!drawMode;
   interaction=null;
   setDrawButtonLabel();
-  txt(dom.drawModeText,drawMode?"Mode dessin actif":"Mode normal");
+  dom.drawModeText.textContent=drawMode?"Mode dessin actif":"Mode normal";
   renderGardenPlan(stateMetricsFromCurrent());
 }
 
@@ -768,10 +705,7 @@ function createZoneFromRect(rect,state){
     name:`Zone ${state.zones.length+1}`,
     cropKey:"tomates",
     cropCustom:"Tomates",
-    x:rect.x,
-    y:rect.y,
-    width:rect.width,
-    height:rect.height,
+    x:rect.x,y:rect.y,width:rect.width,height:rect.height,
     flow:state.defaultFlow,
     seasonMode:"custom",
     kc:CROP_PRESETS.tomates.kc,
@@ -809,6 +743,11 @@ function guessCropKey(value){
   return Object.keys(CROP_PRESETS).find(key=>key===normalized||CROP_PRESETS[key].label.toLowerCase()===normalized)||null;
 }
 
+function truncateLabel(text,maxChars){
+  const value=String(text);
+  return value.length<=maxChars?value:`${value.slice(0,Math.max(3,maxChars-1))}…`;
+}
+
 function roundRect(rect){
   return {x:round(rect.x,2),y:round(rect.y,2),width:round(rect.width,2),height:round(rect.height,2)};
 }
@@ -832,36 +771,6 @@ function svgPoint(event,state=settings()){
   const x=((event.clientX-rect.left)/rect.width)*state.gardenWidth;
   const y=((event.clientY-rect.top)/rect.height)*state.gardenHeight;
   return {x:clamp(x,0,state.gardenWidth,0),y:clamp(y,0,state.gardenHeight,0)};
-}
-
-function useCurrentLocation(){
-  if(!navigator.geolocation){
-    dom.locationStatus.textContent="La géolocalisation n’est pas disponible sur cet appareil.";
-    return;
-  }
-  dom.locationStatus.textContent="Recherche de la position…";
-  navigator.geolocation.getCurrentPosition(
-    position=>{
-      const latitude=round(position.coords.latitude,6);
-      const longitude=round(position.coords.longitude,6);
-      setValue("latitude",latitude);
-      setValue("longitude",longitude);
-      const state=settings();
-      state.latitude=latitude;
-      state.longitude=longitude;
-      persistSettings(state);
-      dom.locationStatus.textContent=`Position enregistrée : ${latitude}, ${longitude}`;
-      refresh();
-    },
-    error=>{
-      let message="Impossible d’obtenir la position.";
-      if(error.code===1)message="Autorisation de localisation refusée.";
-      if(error.code===2)message="Position indisponible.";
-      if(error.code===3)message="La recherche de position a expiré.";
-      dom.locationStatus.textContent=message;
-    },
-    {enableHighAccuracy:true,timeout:15000,maximumAge:300000}
-  );
 }
 
 function setupInstallPrompt(){
@@ -900,9 +809,6 @@ function setLoading(value){
 }
 function showError(message){dom.errorMessage.textContent=message;dom.errorMessage.hidden=false}
 function hideError(){dom.errorMessage.hidden=true}
-function txt(node,value){node.textContent=value}
-function val(id){return document.getElementById(id).value}
-function setValue(id,value){document.getElementById(id).value=value}
 function num(value){const n=Number(value);return Number.isFinite(n)?n:0}
 function clamp(value,min,max,fallback=min){return Number.isFinite(value)?Math.min(max,Math.max(min,value)):fallback}
 function sum(values){return values.reduce((a,b)=>a+num(b),0)}
@@ -922,17 +828,8 @@ function localDateString(date){
 function daysBetween(a,b){
   return Math.max(0,Math.round((new Date(`${b}T12:00:00`)-new Date(`${a}T12:00:00`))/86400000));
 }
-function dayLabel(value){
-  const d=new Date(`${value}T12:00:00`);
-  const today=localDateString(new Date());
-  const tomorrow=new Date();
-  tomorrow.setDate(tomorrow.getDate()+1);
-  if(value===today)return "Aujourd’hui";
-  if(value===localDateString(tomorrow))return "Demain";
-  return d.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"});
-}
-function shortDay(value){
-  return new Date(`${value}T12:00:00`).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"});
+function formatLongDate(value){
+  return new Date(`${value}T12:00:00`).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 }
 function weatherIcon(code){
   if(code===0)return "☀️";
