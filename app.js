@@ -1,19 +1,20 @@
 const SEASON_KC={start:.6,full:.9,end:.7};
-const STORAGE_KEY="monPotagerSettingsV5";
-const LEGACY_KEYS=["monPotagerSettingsV4","monPotagerSettingsV3","monPotagerSettingsV2"];
+const STORAGE_KEY="monPotagerSettingsV6";
+const LEGACY_KEYS=["monPotagerSettingsV5","monPotagerSettingsV4","monPotagerSettingsV3","monPotagerSettingsV2"];
 
 const CROP_PRESETS={
-  tomates:{label:"Tomates",kc:1.05,color:"#e8a09a"},
-  salades:{label:"Salades",kc:0.75,color:"#9dd8a7"},
-  courgettes:{label:"Courgettes",kc:0.95,color:"#f0d37b"},
-  carottes:{label:"Carottes",kc:0.70,color:"#efb07d"},
-  haricots:{label:"Haricots",kc:0.85,color:"#93c8a8"},
-  "pommes-de-terre":{label:"Pommes de terre",kc:1.00,color:"#c9b08d"},
-  poivrons:{label:"Poivrons",kc:0.90,color:"#e4a178"},
-  aubergines:{label:"Aubergines",kc:0.95,color:"#bca4d9"},
-  fraisiers:{label:"Fraisiers",kc:0.80,color:"#ef9ca7"},
-  aromatiques:{label:"Aromatiques",kc:0.55,color:"#97d7c6"},
-  autre:{label:"Autre culture",kc:0.90,color:"#c4d8c7"}
+  tomates:{label:"Tomates",kc:1.05,color:"#ef756f"},
+  mais:{label:"Maïs",kc:1.05,color:"#f2cf52"},
+  salades:{label:"Salades",kc:0.75,color:"#8fce8e"},
+  courgettes:{label:"Courgettes",kc:0.95,color:"#a8c96f"},
+  carottes:{label:"Carottes",kc:0.70,color:"#eea35f"},
+  haricots:{label:"Haricots",kc:0.85,color:"#78b99a"},
+  "pommes-de-terre":{label:"Pommes de terre",kc:1.00,color:"#c9ad7d"},
+  poivrons:{label:"Poivrons",kc:0.90,color:"#ef8c65"},
+  aubergines:{label:"Aubergines",kc:0.95,color:"#b49ad0"},
+  fraisiers:{label:"Fraisiers",kc:0.80,color:"#e98fa0"},
+  aromatiques:{label:"Aromatiques",kc:0.55,color:"#79c8b1"},
+  autre:{label:"Autre culture",kc:0.90,color:"#b8cfbd"}
 };
 
 const DEFAULTS={
@@ -26,12 +27,16 @@ const DEFAULTS={
   defaultKc:.9,
   defaultSeasonMode:"full",
   defaultLastWatering:localDateString(new Date()),
+  locationName:"Lieu actuel",
+  favoriteLocations:[],
   zones:[]
 };
 
 const STATUS_COLORS={green:"#2b8148",yellow:"#b78500",orange:"#d66f1f",red:"#b13131"};
 let weatherRows=[];
 let weatherSelectedDate=null;
+let planZoom=1;
+let locationSearchResults=[];
 let deferredInstallPrompt=null;
 let selectedZoneId=null;
 let drawMode=false;
@@ -53,17 +58,28 @@ function cacheDom(){
   [
     "refreshButton","installButton","installCard","heroCard","advice","rainAdvice","volume",
     "duration","zonesSummary","updatedAt","etpTotal","rainTotal","zoneCount","gardenSurface",
-    "errorMessage","gardenSvg","planSizeText","drawModeText","addZoneButton","deleteZoneButton",
-    "planForm","gardenWidth","gardenHeight","zonesList","zoneForm","noZoneMessage","selectedZoneSurface",
+    "errorMessage","gardenSvg","planWrapper","planSizeText","drawModeText","addZoneButton","deleteZoneButton",
+    "planForm","gardenWidth","gardenHeight","zoomOutButton","zoomInButton","zoomResetButton","zoomValue",
+    "zonesList","zoneForm","noZoneMessage","selectedZoneSurface",
     "zoneId","zoneName","zoneCropKey","zoneCustomCropLabel","zoneCustomCrop","zoneFlow","zoneSeasonMode",
     "zoneCustomKcLabel","zoneKc","zoneLastWatering","weatherDate","weatherPrevButton","weatherNextButton",
-    "weatherDayIcon","weatherDayType","weatherDayLabel","weatherTemp","weatherRain","weatherEtp"
+    "weatherDayIcon","weatherDayType","weatherDayLabel","weatherTemp","weatherRain","weatherEtp",
+    "currentLocationName","currentLocationCoords","useCurrentLocationButton","favoriteLocationButton",
+    "locationSearchForm","locationSearchInput","locationSearchResults","locationFavorites","locationStatus"
   ].forEach(id=>dom[id]=document.getElementById(id));
 }
 
 function bindEvents(){
   dom.refreshButton.addEventListener("click",refresh);
   dom.installButton.addEventListener("click",installApp);
+  dom.useCurrentLocationButton.addEventListener("click",useCurrentLocation);
+  dom.favoriteLocationButton.addEventListener("click",toggleCurrentLocationFavorite);
+  dom.locationSearchForm.addEventListener("submit",searchLocation);
+  dom.locationSearchResults.addEventListener("click",handleLocationSearchResultClick);
+  dom.locationFavorites.addEventListener("click",handleFavoriteLocationClick);
+  dom.zoomOutButton.addEventListener("click",()=>changePlanZoom(-.25));
+  dom.zoomInButton.addEventListener("click",()=>changePlanZoom(.25));
+  dom.zoomResetButton.addEventListener("click",()=>setPlanZoom(1));
   dom.addZoneButton.addEventListener("click",toggleDrawMode);
   dom.deleteZoneButton.addEventListener("click",deleteSelectedZone);
   dom.planForm.addEventListener("submit",savePlanDimensions);
@@ -105,7 +121,16 @@ function onPlanPointerDown(event){
     return;
   }
 
-  if(!actionTarget)return;
+  if(!actionTarget){
+    if(planZoom>1){
+      interaction={
+        type:"pan",pointerId:event.pointerId,startClientX:event.clientX,startClientY:event.clientY,
+        startScrollLeft:dom.planWrapper.scrollLeft,startScrollTop:dom.planWrapper.scrollTop
+      };
+      dom.gardenSvg.setPointerCapture(event.pointerId);
+    }
+    return;
+  }
   const zoneId=actionTarget.getAttribute("data-zone-id");
   const zone=state.zones.find(item=>String(item.id)===String(zoneId));
   if(!zone)return;
@@ -127,6 +152,11 @@ function onPlanPointerDown(event){
 
 function onPlanPointerMove(event){
   if(!interaction||event.pointerId!==interaction.pointerId)return;
+  if(interaction.type==="pan"){
+    dom.planWrapper.scrollLeft=interaction.startScrollLeft-(event.clientX-interaction.startClientX);
+    dom.planWrapper.scrollTop=interaction.startScrollTop-(event.clientY-interaction.startClientY);
+    return;
+  }
   const state=settings();
   const point=svgPoint(event,state);
 
@@ -169,6 +199,7 @@ function onPlanPointerMove(event){
 
 function onPlanPointerUp(event){
   if(!interaction||event.pointerId!==interaction.pointerId)return;
+  if(interaction.type==="pan"){interaction=null;return;}
   const state=settings();
 
   if(interaction.type==="draw"){
@@ -286,6 +317,9 @@ function normalizeState(input={}){
   state.defaultKc=Math.max(0,num(state.defaultKc)||DEFAULTS.defaultKc);
   state.defaultSeasonMode=state.defaultSeasonMode||DEFAULTS.defaultSeasonMode;
   state.defaultLastWatering=state.defaultLastWatering||DEFAULTS.defaultLastWatering;
+  state.locationName=(state.locationName||"Lieu actuel").trim();
+  state.favoriteLocations=Array.isArray(state.favoriteLocations)?state.favoriteLocations
+    .map(item=>normalizeFavoriteLocation(item)).filter(Boolean).slice(0,12):[];
   state.zones=Array.isArray(state.zones)?state.zones.map(zone=>normalizeZone(zone,state)).filter(Boolean):[];
   return state;
 }
@@ -454,6 +488,8 @@ function render(){
   dom.planSizeText.textContent=`Plan : ${round(state.gardenWidth,1)} m × ${round(state.gardenHeight,1)} m`;
   dom.drawModeText.textContent=drawMode?"Mode dessin actif":"Mode normal";
 
+  renderLocationCard();
+  applyPlanZoom();
   renderGardenPlan(zoneMetrics);
   renderZonesList(zoneMetrics);
   renderWeatherDay();
@@ -503,6 +539,8 @@ function renderGardenPlan(zoneMetrics=[]){
   const state=settings();
   const metricsById=new Map(zoneMetrics.map(item=>[String(item.zone.id),item]));
   dom.gardenSvg.setAttribute("viewBox",`0 0 ${state.gardenWidth} ${state.gardenHeight}`);
+  dom.gardenSvg.style.aspectRatio=`${state.gardenWidth} / ${state.gardenHeight}`;
+  applyPlanZoom();
 
   let lines="";
   for(let x=0;x<=Math.floor(state.gardenWidth);x++)lines+=`<line x1="${x}" y1="0" x2="${x}" y2="${state.gardenHeight}"></line>`;
@@ -516,13 +554,15 @@ function renderGardenPlan(zoneMetrics=[]){
     const crop=getCropPreset(zone.cropKey);
     const statusColor=STATUS_COLORS[metric?.status.level||"green"];
     const selected=String(selectedZoneId)===String(zone.id);
-    const cropLabel=truncateLabel(getCropLabel(zone),Math.max(8,Math.floor(rect.width*6)));
+    const cropLabel=truncateLabel(getCropLabel(zone),Math.max(5,Math.floor(rect.width*7)));
     const liters=metric?`${round(metric.volume,1)} L`:"— L";
+    const centerX=rect.x+rect.width/2;
+    const centerY=rect.y+rect.height/2;
 
     html+=`<g data-zone-id="${zone.id}">
       <rect class="zone-rect${selected?" zone-selected":""}" data-zone-id="${zone.id}" data-action="move" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" fill="${crop.color}" stroke="${statusColor}"></rect>
-      <text class="zone-label" x="${rect.x+.14}" y="${rect.y+.34}">${escapeHtml(cropLabel)}</text>
-      <text class="zone-liters" x="${rect.x+.14}" y="${rect.y+.66}">${escapeHtml(liters)}</text>
+      <text class="zone-label" text-anchor="middle" x="${centerX}" y="${centerY-.08}">${escapeHtml(cropLabel)}</text>
+      <text class="zone-liters" text-anchor="middle" x="${centerX}" y="${centerY+.28}">${escapeHtml(liters)}</text>
       ${selected?`<circle class="zone-handle" data-zone-id="${zone.id}" data-action="resize" cx="${rect.x+rect.width}" cy="${rect.y+rect.height}" r="0.14"></circle>`:""}
     </g>`;
   }
@@ -771,6 +811,187 @@ function svgPoint(event,state=settings()){
   const x=((event.clientX-rect.left)/rect.width)*state.gardenWidth;
   const y=((event.clientY-rect.top)/rect.height)*state.gardenHeight;
   return {x:clamp(x,0,state.gardenWidth,0),y:clamp(y,0,state.gardenHeight,0)};
+}
+
+
+function normalizeFavoriteLocation(item){
+  if(!item)return null;
+  const latitude=num(item.latitude);
+  const longitude=num(item.longitude);
+  if(!Number.isFinite(latitude)||!Number.isFinite(longitude))return null;
+  return {
+    id:String(item.id||createId()),
+    name:String(item.name||"Lieu favori").trim(),
+    latitude,
+    longitude
+  };
+}
+
+function renderLocationCard(){
+  const state=settings();
+  dom.currentLocationName.textContent=state.locationName||"Lieu actuel";
+  dom.currentLocationCoords.textContent=`${round(state.latitude,5)}, ${round(state.longitude,5)}`;
+  const favorite=findMatchingFavorite(state);
+  dom.favoriteLocationButton.textContent=favorite?"★ Retirer des favoris":"☆ Ajouter aux favoris";
+  renderFavoriteLocations(state);
+}
+
+function findMatchingFavorite(state){
+  return state.favoriteLocations.find(item=>sameCoordinates(item.latitude,item.longitude,state.latitude,state.longitude));
+}
+
+function sameCoordinates(lat1,lon1,lat2,lon2){
+  return Math.abs(num(lat1)-num(lat2))<.00001&&Math.abs(num(lon1)-num(lon2))<.00001;
+}
+
+function toggleCurrentLocationFavorite(){
+  const state=settings();
+  const existing=findMatchingFavorite(state);
+  if(existing){
+    state.favoriteLocations=state.favoriteLocations.filter(item=>item.id!==existing.id);
+    dom.locationStatus.textContent="Lieu retiré des favoris.";
+  }else{
+    state.favoriteLocations.push({
+      id:createId(),name:state.locationName||"Lieu favori",latitude:state.latitude,longitude:state.longitude
+    });
+    dom.locationStatus.textContent="Lieu ajouté aux favoris.";
+  }
+  persistSettings(state);
+  renderLocationCard();
+}
+
+async function searchLocation(event){
+  event.preventDefault();
+  const query=dom.locationSearchInput.value.trim();
+  if(query.length<2){
+    dom.locationStatus.textContent="Saisis au moins 2 caractères pour rechercher un lieu.";
+    return;
+  }
+  dom.locationStatus.textContent="Recherche du lieu…";
+  dom.locationSearchResults.hidden=true;
+  try{
+    const url=new URL("https://geocoding-api.open-meteo.com/v1/search");
+    url.search=new URLSearchParams({name:query,count:"6",language:"fr",format:"json"}).toString();
+    const response=await fetch(url,{cache:"no-store"});
+    if(!response.ok)throw new Error(`service de recherche ${response.status}`);
+    const data=await response.json();
+    locationSearchResults=Array.isArray(data.results)?data.results:[];
+    renderLocationSearchResults();
+    dom.locationStatus.textContent=locationSearchResults.length?"Choisis un résultat ci-dessous.":"Aucun lieu trouvé.";
+  }catch(error){
+    locationSearchResults=[];
+    dom.locationStatus.textContent="Impossible de rechercher ce lieu pour le moment.";
+  }
+}
+
+function renderLocationSearchResults(){
+  if(!locationSearchResults.length){
+    dom.locationSearchResults.innerHTML="";
+    dom.locationSearchResults.hidden=true;
+    return;
+  }
+  dom.locationSearchResults.innerHTML=locationSearchResults.map((item,index)=>{
+    const parts=[item.name,item.admin1,item.country].filter(Boolean);
+    const label=[...new Set(parts)].join(", ");
+    return `<button type="button" class="location-result-button" data-location-index="${index}">
+      <strong>${escapeHtml(item.name||"Lieu")}</strong>
+      <span>${escapeHtml(label)}</span>
+    </button>`;
+  }).join("");
+  dom.locationSearchResults.hidden=false;
+}
+
+function handleLocationSearchResultClick(event){
+  const button=event.target.closest("button[data-location-index]");
+  if(!button)return;
+  const item=locationSearchResults[num(button.getAttribute("data-location-index"))];
+  if(!item)return;
+  const label=[item.name,item.admin1,item.country].filter(Boolean);
+  selectLocation({name:[...new Set(label)].join(", "),latitude:item.latitude,longitude:item.longitude});
+  dom.locationSearchResults.hidden=true;
+  dom.locationSearchInput.value="";
+}
+
+function useCurrentLocation(){
+  if(!navigator.geolocation){
+    dom.locationStatus.textContent="La géolocalisation n’est pas disponible sur cet appareil.";
+    return;
+  }
+  dom.locationStatus.textContent="Recherche de ta position…";
+  navigator.geolocation.getCurrentPosition(
+    position=>{
+      selectLocation({
+        name:"Ma position actuelle",
+        latitude:round(position.coords.latitude,6),
+        longitude:round(position.coords.longitude,6)
+      });
+    },
+    error=>{
+      let message="Impossible d’obtenir la position.";
+      if(error.code===1)message="Autorisation de localisation refusée.";
+      if(error.code===2)message="Position indisponible.";
+      if(error.code===3)message="La recherche de position a expiré.";
+      dom.locationStatus.textContent=message;
+    },
+    {enableHighAccuracy:true,timeout:15000,maximumAge:300000}
+  );
+}
+
+function selectLocation(location){
+  const state=settings();
+  state.latitude=num(location.latitude);
+  state.longitude=num(location.longitude);
+  state.locationName=String(location.name||"Lieu actuel");
+  persistSettings(state);
+  weatherSelectedDate=null;
+  dom.locationStatus.textContent=`Localisation utilisée : ${state.locationName}`;
+  renderLocationCard();
+  refresh();
+}
+
+function renderFavoriteLocations(state=settings()){
+  if(!state.favoriteLocations.length){
+    dom.locationFavorites.innerHTML='<span class="muted favorite-empty">Aucun lieu favori.</span>';
+    return;
+  }
+  dom.locationFavorites.innerHTML=state.favoriteLocations.map(item=>`<span class="favorite-location-chip">
+    <button type="button" class="favorite-select" data-favorite-action="select" data-favorite-id="${item.id}">${escapeHtml(item.name)}</button>
+    <button type="button" class="favorite-remove" data-favorite-action="remove" data-favorite-id="${item.id}" aria-label="Retirer ${escapeHtml(item.name)} des favoris">×</button>
+  </span>`).join("");
+}
+
+function handleFavoriteLocationClick(event){
+  const button=event.target.closest("button[data-favorite-action]");
+  if(!button)return;
+  const state=settings();
+  const favorite=state.favoriteLocations.find(item=>item.id===button.getAttribute("data-favorite-id"));
+  if(!favorite)return;
+  if(button.getAttribute("data-favorite-action")==="remove"){
+    state.favoriteLocations=state.favoriteLocations.filter(item=>item.id!==favorite.id);
+    persistSettings(state);
+    dom.locationStatus.textContent="Lieu retiré des favoris.";
+    renderLocationCard();
+    return;
+  }
+  selectLocation(favorite);
+}
+
+function changePlanZoom(delta){
+  setPlanZoom(planZoom+delta);
+}
+
+function setPlanZoom(value){
+  planZoom=clamp(value,1,4,1);
+  applyPlanZoom();
+}
+
+function applyPlanZoom(){
+  if(!dom.gardenSvg)return;
+  dom.gardenSvg.style.width=`${Math.round(planZoom*100)}%`;
+  dom.gardenSvg.style.maxWidth="none";
+  if(dom.zoomValue)dom.zoomValue.textContent=`${Math.round(planZoom*100)} %`;
+  if(dom.zoomOutButton)dom.zoomOutButton.disabled=planZoom<=1;
+  if(dom.zoomInButton)dom.zoomInButton.disabled=planZoom>=4;
 }
 
 function setupInstallPrompt(){

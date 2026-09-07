@@ -58,6 +58,36 @@
     </div>
   </section>
 
+  <section class="card location-card">
+    <div class="section-heading section-heading-stack-mobile">
+      <div>
+        <p class="label">Localisation</p>
+        <h2 id="currentLocationName">Lieu actuel</h2>
+        <p id="currentLocationCoords" class="muted"></p>
+      </div>
+      <div class="location-main-actions">
+        <button id="useCurrentLocationButton" type="button" class="secondary-button">📍 Trouver ma position</button>
+        <button id="favoriteLocationButton" type="button" class="ghost-button">☆ Ajouter aux favoris</button>
+      </div>
+    </div>
+
+    <form id="locationSearchForm" class="location-search-form">
+      <label for="locationSearchInput">Chercher un lieu</label>
+      <div class="location-search-row">
+        <input id="locationSearchInput" type="search" placeholder="Ex. Montpellier, Sommières…" autocomplete="off">
+        <button type="submit" class="secondary-button">Rechercher</button>
+      </div>
+    </form>
+
+    <div id="locationSearchResults" class="location-search-results" hidden></div>
+
+    <div class="favorites-block">
+      <span class="favorites-title">Mes favoris</span>
+      <div id="locationFavorites" class="favorite-locations"></div>
+    </div>
+    <p id="locationStatus" class="muted location-status"></p>
+  </section>
+
   <section class="metrics">
     <article class="card metric-card">
       <span>ETP sur 7 jours</span>
@@ -102,16 +132,24 @@
       <button type="submit" class="ghost-button">Mettre à jour le plan</button>
     </form>
 
-    <div class="plan-meta">
-      <span id="planSizeText">Plan : —</span>
-      <span id="drawModeText">Mode normal</span>
+    <div class="plan-toolbar">
+      <div class="plan-meta">
+        <span id="planSizeText">Plan : —</span>
+        <span id="drawModeText">Mode normal</span>
+      </div>
+      <div class="zoom-controls" aria-label="Zoom du plan">
+        <button id="zoomOutButton" type="button" class="zoom-button" aria-label="Dézoomer">−</button>
+        <span id="zoomValue">100 %</span>
+        <button id="zoomInButton" type="button" class="zoom-button" aria-label="Zoomer">+</button>
+        <button id="zoomResetButton" type="button" class="zoom-reset-button">100 %</button>
+      </div>
     </div>
 
-    <div class="plan-wrapper">
+    <div id="planWrapper" class="plan-wrapper">
       <svg id="gardenSvg" class="garden-svg" viewBox="0 0 8 4" preserveAspectRatio="xMidYMid meet" aria-label="Plan du potager"></svg>
     </div>
 
-    <p class="muted zone-help">Le recouvrement entre zones est bloqué. Sélectionne une zone sur le plan pour la modifier.</p>
+    <p class="muted zone-help">Le recouvrement entre zones est bloqué. Quand tu zoomes, fais glisser le fond du plan pour te déplacer.</p>
   </section>
 
   <section class="card">
@@ -135,6 +173,7 @@
           Culture
           <select id="zoneCropKey" required>
             <option value="tomates">Tomates</option>
+            <option value="mais">Maïs</option>
             <option value="salades">Salades</option>
             <option value="courgettes">Courgettes</option>
             <option value="carottes">Carottes</option>
