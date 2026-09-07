@@ -24,7 +24,6 @@
 </header>
 
 <main>
-
   <section id="installCard" class="card install-card" hidden>
     <div>
       <p class="label">Installation</p>
@@ -33,49 +32,174 @@
     </div>
     <button id="installButton" class="primary-button">📲 Installer l’application</button>
   </section>
+
   <section id="heroCard" class="hero card status-green">
     <div class="status-line">
       <span id="statusDot" class="status-dot"></span>
-      <p class="label">Conseil actuel</p>
+      <p class="label">Conseil global</p>
     </div>
     <h2 id="advice">Chargement…</h2>
     <p id="rainAdvice" class="rain-advice"></p>
 
     <div class="hero-grid">
       <div>
-        <span class="metric-label">À apporter</span>
+        <span class="metric-label">Volume total</span>
         <strong id="volume">— L</strong>
       </div>
       <div>
-        <span class="metric-label">Durée</span>
+        <span class="metric-label">Durée totale</span>
         <strong id="duration">—</strong>
       </div>
     </div>
 
-    <button id="wateredButton" class="primary-button">💧 J’ai arrosé</button>
     <div class="watering-meta">
-      <span id="lastWateringText"></span>
-      <span id="daysSinceWatering"></span>
+      <span id="zonesSummary"></span>
+      <span id="updatedAt"></span>
     </div>
   </section>
 
   <section class="metrics">
     <article class="card metric-card">
-      <span>ETP cumulée</span>
+      <span>ETP sur 7 jours</span>
       <strong id="etpTotal">— mm</strong>
     </article>
     <article class="card metric-card">
-      <span>Pluie cumulée</span>
+      <span>Pluie sur 7 jours</span>
       <strong id="rainTotal">— mm</strong>
     </article>
     <article class="card metric-card">
-      <span>Dose nette</span>
-      <strong id="dose">— mm</strong>
+      <span>Zones à arroser</span>
+      <strong id="zoneCount">—</strong>
     </article>
     <article class="card metric-card">
-      <span>Pluie à 3 jours</span>
-      <strong id="rain3Days">— mm</strong>
+      <span>Surface totale</span>
+      <strong id="gardenSurface">— m²</strong>
     </article>
+  </section>
+
+  <section class="card garden-card">
+    <div class="section-heading section-heading-stack-mobile">
+      <div>
+        <p class="label">Plan du potager</p>
+        <h2>Découper le jardin en zones</h2>
+        <p class="muted zone-help">Dessine un rectangle pour chaque culture. Ensuite, glisse la zone pour la déplacer ou utilise la poignée en bas à droite pour la redimensionner.</p>
+      </div>
+      <div class="plan-actions">
+        <button id="addZoneButton" type="button" class="secondary-button">✏️ Dessiner une zone</button>
+        <button id="deleteZoneButton" type="button" class="ghost-button" disabled>🗑️ Supprimer la zone</button>
+      </div>
+    </div>
+
+    <div class="plan-meta">
+      <span id="planSizeText">Plan : —</span>
+      <span id="drawModeText">Mode normal</span>
+    </div>
+
+    <div class="plan-wrapper">
+      <svg id="gardenSvg" class="garden-svg" viewBox="0 0 8 4" preserveAspectRatio="xMidYMid meet" aria-label="Plan du potager"></svg>
+    </div>
+
+    <p class="muted zone-help">Le recouvrement entre zones est bloqué pour garder un plan propre.</p>
+  </section>
+
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <p class="label">Zone sélectionnée</p>
+        <h2>Paramètres de la culture</h2>
+      </div>
+      <span id="selectedZoneSurface" class="muted"></span>
+    </div>
+
+    <form id="zoneForm" class="zone-form">
+      <input id="zoneId" type="hidden">
+
+      <div class="mini-grid mini-grid-2">
+        <label>
+          Nom de la zone
+          <input id="zoneName" type="text" placeholder="Ex. Tomates sud" required>
+        </label>
+        <label>
+          Culture
+          <select id="zoneCropKey" required>
+            <option value="tomates">Tomates</option>
+            <option value="salades">Salades</option>
+            <option value="courgettes">Courgettes</option>
+            <option value="carottes">Carottes</option>
+            <option value="haricots">Haricots</option>
+            <option value="pommes-de-terre">Pommes de terre</option>
+            <option value="poivrons">Poivrons</option>
+            <option value="aubergines">Aubergines</option>
+            <option value="fraisiers">Fraisiers</option>
+            <option value="aromatiques">Aromatiques</option>
+            <option value="autre">Autre culture</option>
+          </select>
+        </label>
+      </div>
+
+      <label id="zoneCustomCropLabel">
+        Nom de la culture
+        <input id="zoneCustomCrop" type="text" placeholder="Ex. Concombres">
+      </label>
+
+      <div class="mini-grid">
+        <label>
+          X (m)
+          <input id="zoneX" type="number" min="0" step="0.1" required>
+        </label>
+        <label>
+          Y (m)
+          <input id="zoneY" type="number" min="0" step="0.1" required>
+        </label>
+        <label>
+          Largeur (m)
+          <input id="zoneWidth" type="number" min="0.1" step="0.1" required>
+        </label>
+        <label>
+          Hauteur (m)
+          <input id="zoneHeight" type="number" min="0.1" step="0.1" required>
+        </label>
+      </div>
+
+      <div class="mini-grid">
+        <label>
+          Débit d’arrosage (L/min)
+          <input id="zoneFlow" type="number" min="0.1" step="0.1" required>
+        </label>
+        <label>
+          Mode Kc
+          <select id="zoneSeasonMode">
+            <option value="start">Début de saison — Kc 0,60</option>
+            <option value="full">Pleine production — Kc 0,90</option>
+            <option value="end">Fin de saison — Kc 0,70</option>
+            <option value="custom">Kc personnalisé</option>
+          </select>
+        </label>
+        <label id="zoneCustomKcLabel">
+          Coefficient cultural Kc
+          <input id="zoneKc" type="number" min="0" max="2" step="0.05" required>
+        </label>
+        <label>
+          Dernier arrosage
+          <input id="zoneLastWatering" type="date" required>
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="secondary-button">Enregistrer la zone</button>
+        <button id="markZoneWateredButton" type="button" class="primary-button inline-button">💧 J’ai arrosé cette zone</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <p class="label">Arrosage par culture</p>
+        <h2>Conseils par zone</h2>
+      </div>
+    </div>
+    <div id="zonesList" class="zones-list"></div>
   </section>
 
   <section class="card">
@@ -95,13 +219,12 @@
         <p class="label">Météo</p>
         <h2>7 prochains jours</h2>
       </div>
-      <span id="updatedAt" class="muted"></span>
     </div>
     <div id="forecast" class="forecast-list"></div>
   </section>
 
   <details class="card settings-card">
-    <summary>⚙️ Paramètres</summary>
+    <summary>⚙️ Paramètres généraux</summary>
     <form id="settingsForm">
       <label>
         Latitude
@@ -113,35 +236,49 @@
       </label>
       <button id="useLocationButton" type="button" class="secondary-button">📍 Utiliser ma position actuelle</button>
       <p id="locationStatus" class="muted"></p>
-      <label>
-        Surface du potager (m²)
-        <input id="surface" type="number" min="0.1" step="0.1" required>
-      </label>
-      <label>
-        Débit du tuyau (L/min)
-        <input id="flow" type="number" min="0.1" step="0.1" required>
-      </label>
-      <label>
-        Stade de la saison
-        <select id="seasonMode">
-          <option value="start">Début de saison — Kc 0,60</option>
-          <option value="full">Pleine production — Kc 0,90</option>
-          <option value="end">Fin de saison — Kc 0,70</option>
-          <option value="custom">Kc personnalisé</option>
-        </select>
-      </label>
-      <label id="customKcLabel">
-        Coefficient cultural Kc
-        <input id="kc" type="number" min="0" max="2" step="0.05" required>
-      </label>
+
+      <div class="mini-grid mini-grid-2">
+        <label>
+          Largeur du potager (m)
+          <input id="gardenWidth" type="number" min="1" step="0.1" required>
+        </label>
+        <label>
+          Hauteur du potager (m)
+          <input id="gardenHeight" type="number" min="1" step="0.1" required>
+        </label>
+      </div>
+
       <label>
         Efficacité de la pluie
         <input id="rainEfficiency" type="number" min="0" max="1" step="0.05" required>
       </label>
-      <label>
-        Date du dernier arrosage
-        <input id="lastWatering" type="date" required>
-      </label>
+
+      <p class="muted settings-note">Ces valeurs servent de base lors de la création d’une nouvelle zone.</p>
+
+      <div class="mini-grid">
+        <label>
+          Débit par défaut (L/min)
+          <input id="defaultFlow" type="number" min="0.1" step="0.1" required>
+        </label>
+        <label>
+          Mode Kc par défaut
+          <select id="defaultSeasonMode">
+            <option value="start">Début de saison — Kc 0,60</option>
+            <option value="full">Pleine production — Kc 0,90</option>
+            <option value="end">Fin de saison — Kc 0,70</option>
+            <option value="custom">Kc personnalisé</option>
+          </select>
+        </label>
+        <label id="defaultCustomKcLabel">
+          Kc par défaut
+          <input id="defaultKc" type="number" min="0" max="2" step="0.05" required>
+        </label>
+        <label>
+          Dernier arrosage par défaut
+          <input id="defaultLastWatering" type="date" required>
+        </label>
+      </div>
+
       <button type="submit" class="secondary-button">Enregistrer</button>
     </form>
   </details>
