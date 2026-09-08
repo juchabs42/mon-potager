@@ -1,19 +1,19 @@
-MON POTAGER — VERSION V4
+MON POTAGER — VERSION V5
 
 Nouveautés :
-- zoom du plan de 100 % à 400 %
-- déplacement du plan zoomé en faisant glisser le fond
-- texte centré dans les zones : culture + litres à apporter
-- couleurs par culture (tomate rouge, maïs jaune, etc.)
-- encart Localisation juste sous le conseil global
-- géolocalisation avec « Trouver ma position »
-- recherche d’un lieu par nom
-- ajout et suppression de lieux favoris
-- retour rapide vers un lieu favori
+- bordures du plan et des zones plus fines
+- texte de chaque zone centré et ajusté automatiquement pour rester dans le rectangle
+- affichage complet : nom de la culture + litres à apporter
+- quadrillage tous les 0,5 m : chaque carré représente 0,25 m²
+- localisation déplacée tout en bas de l’encart Météo
+- localisation compacte : aucun affichage latitude / longitude
+- bouton « Trouver ma position » conservé
+- bouton « Rechercher un lieu » qui ouvre la barre de recherche seulement à la demande
+- favoris conservés sur une ligne compacte
 
 MISE À JOUR GITHUB
 Remplace les fichiers de ton dépôt par tous les fichiers présents dans ce ZIP puis fais un Commit changes.
-Le service worker utilise un nouveau cache V6 pour forcer la mise à jour de l’application.
+Le service worker utilise le cache V7 pour forcer la mise à jour de l’application.
 
 Si l’ancienne version reste visible :
 1. ferme complètement l’application / Chrome ;

@@ -1,6 +1,6 @@
 const SEASON_KC={start:.6,full:.9,end:.7};
-const STORAGE_KEY="monPotagerSettingsV6";
-const LEGACY_KEYS=["monPotagerSettingsV5","monPotagerSettingsV4","monPotagerSettingsV3","monPotagerSettingsV2"];
+const STORAGE_KEY="monPotagerSettingsV7";
+const LEGACY_KEYS=["monPotagerSettingsV6","monPotagerSettingsV5","monPotagerSettingsV4","monPotagerSettingsV3","monPotagerSettingsV2"];
 
 const CROP_PRESETS={
   tomates:{label:"Tomates",kc:1.05,color:"#ef756f"},
@@ -64,7 +64,7 @@ function cacheDom(){
     "zoneId","zoneName","zoneCropKey","zoneCustomCropLabel","zoneCustomCrop","zoneFlow","zoneSeasonMode",
     "zoneCustomKcLabel","zoneKc","zoneLastWatering","weatherDate","weatherPrevButton","weatherNextButton",
     "weatherDayIcon","weatherDayType","weatherDayLabel","weatherTemp","weatherRain","weatherEtp",
-    "currentLocationName","currentLocationCoords","useCurrentLocationButton","favoriteLocationButton",
+    "currentLocationName","useCurrentLocationButton","toggleLocationSearchButton","favoriteLocationButton",
     "locationSearchForm","locationSearchInput","locationSearchResults","locationFavorites","locationStatus"
   ].forEach(id=>dom[id]=document.getElementById(id));
 }
@@ -73,6 +73,7 @@ function bindEvents(){
   dom.refreshButton.addEventListener("click",refresh);
   dom.installButton.addEventListener("click",installApp);
   dom.useCurrentLocationButton.addEventListener("click",useCurrentLocation);
+  dom.toggleLocationSearchButton.addEventListener("click",toggleLocationSearch);
   dom.favoriteLocationButton.addEventListener("click",toggleCurrentLocationFavorite);
   dom.locationSearchForm.addEventListener("submit",searchLocation);
   dom.locationSearchResults.addEventListener("click",handleLocationSearchResultClick);
@@ -485,7 +486,7 @@ function render(){
   dom.rainTotal.textContent=`${round(rain7,2)} mm`;
   dom.zoneCount.textContent=String(zonesToWater);
   dom.gardenSurface.textContent=`${round(totalSurface,1)} m²`;
-  dom.planSizeText.textContent=`Plan : ${round(state.gardenWidth,1)} m × ${round(state.gardenHeight,1)} m`;
+  dom.planSizeText.textContent=`Plan : ${round(state.gardenWidth,1)} m × ${round(state.gardenHeight,1)} m · 1 carré = 0,25 m²`;
   dom.drawModeText.textContent=drawMode?"Mode dessin actif":"Mode normal";
 
   renderLocationCard();
@@ -543,8 +544,15 @@ function renderGardenPlan(zoneMetrics=[]){
   applyPlanZoom();
 
   let lines="";
-  for(let x=0;x<=Math.floor(state.gardenWidth);x++)lines+=`<line x1="${x}" y1="0" x2="${x}" y2="${state.gardenHeight}"></line>`;
-  for(let y=0;y<=Math.floor(state.gardenHeight);y++)lines+=`<line x1="0" y1="${y}" x2="${state.gardenWidth}" y2="${y}"></line>`;
+  const gridStep=.5;
+  for(let x=0;x<=state.gardenWidth+.0001;x+=gridStep){
+    const gx=round(Math.min(x,state.gardenWidth),2);
+    lines+=`<line x1="${gx}" y1="0" x2="${gx}" y2="${state.gardenHeight}"></line>`;
+  }
+  for(let y=0;y<=state.gardenHeight+.0001;y+=gridStep){
+    const gy=round(Math.min(y,state.gardenHeight),2);
+    lines+=`<line x1="0" y1="${gy}" x2="${state.gardenWidth}" y2="${gy}"></line>`;
+  }
 
   let html=`<g class="garden-grid">${lines}</g><rect class="garden-outline" x="0" y="0" width="${state.gardenWidth}" height="${state.gardenHeight}" rx="0.24" ry="0.24"></rect>`;
 
@@ -554,16 +562,17 @@ function renderGardenPlan(zoneMetrics=[]){
     const crop=getCropPreset(zone.cropKey);
     const statusColor=STATUS_COLORS[metric?.status.level||"green"];
     const selected=String(selectedZoneId)===String(zone.id);
-    const cropLabel=truncateLabel(getCropLabel(zone),Math.max(5,Math.floor(rect.width*7)));
+    const cropLabel=getCropLabel(zone);
     const liters=metric?`${round(metric.volume,1)} L`:"— L";
     const centerX=rect.x+rect.width/2;
     const centerY=rect.y+rect.height/2;
+    const textLayout=zoneTextLayout(cropLabel,liters,rect);
 
     html+=`<g data-zone-id="${zone.id}">
       <rect class="zone-rect${selected?" zone-selected":""}" data-zone-id="${zone.id}" data-action="move" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" fill="${crop.color}" stroke="${statusColor}"></rect>
-      <text class="zone-label" text-anchor="middle" x="${centerX}" y="${centerY-.08}">${escapeHtml(cropLabel)}</text>
-      <text class="zone-liters" text-anchor="middle" x="${centerX}" y="${centerY+.28}">${escapeHtml(liters)}</text>
-      ${selected?`<circle class="zone-handle" data-zone-id="${zone.id}" data-action="resize" cx="${rect.x+rect.width}" cy="${rect.y+rect.height}" r="0.14"></circle>`:""}
+      <text class="zone-label" text-anchor="middle" x="${centerX}" y="${textLayout.labelY}" font-size="${textLayout.labelFont}"${textLayout.labelTextLength}>${escapeHtml(cropLabel)}</text>
+      <text class="zone-liters" text-anchor="middle" x="${centerX}" y="${textLayout.litersY}" font-size="${textLayout.litersFont}"${textLayout.litersTextLength}>${escapeHtml(liters)}</text>
+      ${selected?`<circle class="zone-handle" data-zone-id="${zone.id}" data-action="resize" cx="${rect.x+rect.width}" cy="${rect.y+rect.height}" r="0.11"></circle>`:""}
     </g>`;
   }
 
@@ -783,9 +792,24 @@ function guessCropKey(value){
   return Object.keys(CROP_PRESETS).find(key=>key===normalized||CROP_PRESETS[key].label.toLowerCase()===normalized)||null;
 }
 
-function truncateLabel(text,maxChars){
-  const value=String(text);
-  return value.length<=maxChars?value:`${value.slice(0,Math.max(3,maxChars-1))}…`;
+function zoneTextLayout(label,liters,rect){
+  const safeWidth=Math.max(.08,rect.width-Math.min(.16,rect.width*.16));
+  const maxFont=Math.min(.34,Math.max(.07,rect.height*.23));
+  const litersFont=Math.min(.31,Math.max(.065,rect.height*.21));
+  const labelEstimate=String(label).length*maxFont*.57;
+  const litersEstimate=String(liters).length*litersFont*.55;
+  const labelTextLength=labelEstimate>safeWidth?` textLength="${round(safeWidth,3)}" lengthAdjust="spacingAndGlyphs"`:"";
+  const litersTextLength=litersEstimate>safeWidth?` textLength="${round(safeWidth,3)}" lengthAdjust="spacingAndGlyphs"`:"";
+  const centerY=rect.y+rect.height/2;
+  const gap=Math.min(.06,rect.height*.05);
+  return {
+    labelFont:round(maxFont,3),
+    litersFont:round(litersFont,3),
+    labelY:round(centerY-maxFont*.62-gap/2,3),
+    litersY:round(centerY+litersFont*.62+gap/2,3),
+    labelTextLength,
+    litersTextLength
+  };
 }
 
 function roundRect(rect){
@@ -830,9 +854,10 @@ function normalizeFavoriteLocation(item){
 function renderLocationCard(){
   const state=settings();
   dom.currentLocationName.textContent=state.locationName||"Lieu actuel";
-  dom.currentLocationCoords.textContent=`${round(state.latitude,5)}, ${round(state.longitude,5)}`;
   const favorite=findMatchingFavorite(state);
-  dom.favoriteLocationButton.textContent=favorite?"★ Retirer des favoris":"☆ Ajouter aux favoris";
+  dom.favoriteLocationButton.textContent=favorite?"★":"☆";
+  dom.favoriteLocationButton.setAttribute("aria-label",favorite?"Retirer ce lieu des favoris":"Ajouter ce lieu aux favoris");
+  dom.favoriteLocationButton.title=favorite?"Retirer des favoris":"Ajouter aux favoris";
   renderFavoriteLocations(state);
 }
 
@@ -858,6 +883,18 @@ function toggleCurrentLocationFavorite(){
   }
   persistSettings(state);
   renderLocationCard();
+}
+
+function toggleLocationSearch(){
+  const willOpen=dom.locationSearchForm.hidden;
+  dom.locationSearchForm.hidden=!willOpen;
+  dom.toggleLocationSearchButton.textContent=willOpen?"Fermer":"Rechercher un lieu";
+  if(willOpen){
+    dom.locationSearchInput.focus();
+  }else{
+    dom.locationSearchResults.hidden=true;
+    dom.locationStatus.textContent="";
+  }
 }
 
 async function searchLocation(event){
@@ -909,6 +946,8 @@ function handleLocationSearchResultClick(event){
   const label=[item.name,item.admin1,item.country].filter(Boolean);
   selectLocation({name:[...new Set(label)].join(", "),latitude:item.latitude,longitude:item.longitude});
   dom.locationSearchResults.hidden=true;
+  dom.locationSearchForm.hidden=true;
+  dom.toggleLocationSearchButton.textContent="Rechercher un lieu";
   dom.locationSearchInput.value="";
 }
 
@@ -951,7 +990,7 @@ function selectLocation(location){
 
 function renderFavoriteLocations(state=settings()){
   if(!state.favoriteLocations.length){
-    dom.locationFavorites.innerHTML='<span class="muted favorite-empty">Aucun lieu favori.</span>';
+    dom.locationFavorites.innerHTML='<span class="muted favorite-empty">Aucun</span>';
     return;
   }
   dom.locationFavorites.innerHTML=state.favoriteLocations.map(item=>`<span class="favorite-location-chip">

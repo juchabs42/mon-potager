@@ -58,36 +58,6 @@
     </div>
   </section>
 
-  <section class="card location-card">
-    <div class="section-heading section-heading-stack-mobile">
-      <div>
-        <p class="label">Localisation</p>
-        <h2 id="currentLocationName">Lieu actuel</h2>
-        <p id="currentLocationCoords" class="muted"></p>
-      </div>
-      <div class="location-main-actions">
-        <button id="useCurrentLocationButton" type="button" class="secondary-button">📍 Trouver ma position</button>
-        <button id="favoriteLocationButton" type="button" class="ghost-button">☆ Ajouter aux favoris</button>
-      </div>
-    </div>
-
-    <form id="locationSearchForm" class="location-search-form">
-      <label for="locationSearchInput">Chercher un lieu</label>
-      <div class="location-search-row">
-        <input id="locationSearchInput" type="search" placeholder="Ex. Montpellier, Sommières…" autocomplete="off">
-        <button type="submit" class="secondary-button">Rechercher</button>
-      </div>
-    </form>
-
-    <div id="locationSearchResults" class="location-search-results" hidden></div>
-
-    <div class="favorites-block">
-      <span class="favorites-title">Mes favoris</span>
-      <div id="locationFavorites" class="favorite-locations"></div>
-    </div>
-    <p id="locationStatus" class="muted location-status"></p>
-  </section>
-
   <section class="metrics">
     <article class="card metric-card">
       <span>ETP sur 7 jours</span>
@@ -261,6 +231,36 @@
         <div><span>Pluie</span><strong id="weatherRain">—</strong></div>
         <div><span>ETP</span><strong id="weatherEtp">—</strong></div>
       </div>
+    </div>
+
+    <div class="weather-location-compact">
+      <div class="weather-location-row">
+        <div class="weather-location-current">
+          <span class="weather-location-icon">📍</span>
+          <div>
+            <span class="weather-location-label">Localisation</span>
+            <strong id="currentLocationName">Lieu actuel</strong>
+          </div>
+        </div>
+        <div class="weather-location-actions">
+          <button id="useCurrentLocationButton" type="button" class="compact-button">Trouver ma position</button>
+          <button id="toggleLocationSearchButton" type="button" class="compact-button">Rechercher un lieu</button>
+          <button id="favoriteLocationButton" type="button" class="compact-favorite-button" aria-label="Ajouter ce lieu aux favoris">☆</button>
+        </div>
+      </div>
+
+      <form id="locationSearchForm" class="compact-location-search" hidden>
+        <input id="locationSearchInput" type="search" placeholder="Ex. Montpellier, Sommières…" autocomplete="off" aria-label="Rechercher un lieu">
+        <button type="submit" class="compact-button compact-search-submit">Rechercher</button>
+      </form>
+
+      <div id="locationSearchResults" class="location-search-results compact-search-results" hidden></div>
+
+      <div class="compact-favorites-row">
+        <span class="compact-favorites-title">Favoris</span>
+        <div id="locationFavorites" class="favorite-locations"></div>
+      </div>
+      <p id="locationStatus" class="muted location-status compact-location-status"></p>
     </div>
   </section>
 
