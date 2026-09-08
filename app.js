@@ -1,6 +1,6 @@
 const SEASON_KC={start:.6,full:.9,end:.7};
-const STORAGE_KEY="monPotagerSettingsV7";
-const LEGACY_KEYS=["monPotagerSettingsV6","monPotagerSettingsV5","monPotagerSettingsV4","monPotagerSettingsV3","monPotagerSettingsV2"];
+const STORAGE_KEY="monPotagerSettingsV8";
+const LEGACY_KEYS=["monPotagerSettingsV7","monPotagerSettingsV6","monPotagerSettingsV5","monPotagerSettingsV4","monPotagerSettingsV3","monPotagerSettingsV2"];
 
 const CROP_PRESETS={
   tomates:{label:"Tomates",kc:1.05,color:"#ef756f"},
@@ -61,7 +61,7 @@ function cacheDom(){
     "errorMessage","gardenSvg","planWrapper","planSizeText","drawModeText","addZoneButton","deleteZoneButton",
     "planForm","gardenWidth","gardenHeight","zoomOutButton","zoomInButton","zoomResetButton","zoomValue",
     "zonesList","zoneForm","noZoneMessage","selectedZoneSurface",
-    "zoneId","zoneName","zoneCropKey","zoneCustomCropLabel","zoneCustomCrop","zoneFlow","zoneSeasonMode",
+    "zoneId","zoneName","zoneCropKey","zoneCustomCropLabel","zoneCustomCrop","zoneFinished","zoneFlow","zoneSeasonMode",
     "zoneCustomKcLabel","zoneKc","zoneLastWatering","weatherDate","weatherPrevButton","weatherNextButton",
     "weatherDayIcon","weatherDayType","weatherDayLabel","weatherTemp","weatherRain","weatherEtp",
     "currentLocationName","useCurrentLocationButton","toggleLocationSearchButton","favoriteLocationButton",
@@ -342,7 +342,8 @@ function normalizeZone(zone,state){
     flow:Math.max(.1,num(zone.flow)||state.defaultFlow),
     kc:Math.max(0,num(zone.kc)||state.defaultKc),
     seasonMode:zone.seasonMode||state.defaultSeasonMode,
-    lastWatering:zone.lastWatering||state.defaultLastWatering
+    lastWatering:zone.lastWatering||state.defaultLastWatering,
+    finished:Boolean(zone.finished)
   };
 }
 
@@ -375,6 +376,7 @@ function loadSelectedZoneIntoForm(){
   dom.zoneName.value=zone.name;
   dom.zoneCropKey.value=zone.cropKey;
   dom.zoneCustomCrop.value=zone.cropKey==="autre"?zone.cropCustom:"";
+  dom.zoneFinished.checked=Boolean(zone.finished);
   dom.zoneFlow.value=zone.flow;
   dom.zoneSeasonMode.value=zone.seasonMode;
   dom.zoneKc.value=zone.kc;
@@ -501,6 +503,21 @@ function computeZoneMetrics(zone,state,today){
   const period=weatherRows.filter(row=>row.date>zone.lastWatering&&row.date<=today);
   const etp=sum(period.map(row=>row.etp));
   const rain=sum(period.map(row=>row.rain));
+  const surface=zone.width*zone.height;
+  const days=daysBetween(zone.lastWatering,today);
+
+  if(zone.finished){
+    return {
+      zone,etp,rain,dose:0,surface,volume:0,minutes:0,rain3:0,days,
+      status:{
+        level:"green",
+        title:"Culture terminée",
+        message:"Aucun arrosage n’est calculé pour cette zone.",
+        recommendedDose:0
+      }
+    };
+  }
+
   const etc=etp*activeKc(zone);
   const effectiveRain=rain*num(state.rainEfficiency);
   const dose=Math.max(0,etc-effectiveRain);
@@ -508,10 +525,8 @@ function computeZoneMetrics(zone,state,today){
   const rain3=sum(future.map(row=>row.rain));
   const effectiveFutureRain=rain3*num(state.rainEfficiency);
   const status=computeStatus(dose,effectiveFutureRain,rain3);
-  const surface=zone.width*zone.height;
   const volume=Math.max(0,status.recommendedDose*surface);
   const minutes=zone.flow>0?volume/zone.flow:0;
-  const days=daysBetween(zone.lastWatering,today);
   return {zone,etp,rain,dose,status,surface,volume,minutes,rain3,days};
 }
 
@@ -562,15 +577,15 @@ function renderGardenPlan(zoneMetrics=[]){
     const crop=getCropPreset(zone.cropKey);
     const statusColor=STATUS_COLORS[metric?.status.level||"green"];
     const selected=String(selectedZoneId)===String(zone.id);
-    const cropLabel=getCropLabel(zone);
+    const zoneLabel=zone.name||"Zone";
     const liters=metric?`${round(metric.volume,1)} L`:"— L";
     const centerX=rect.x+rect.width/2;
     const centerY=rect.y+rect.height/2;
-    const textLayout=zoneTextLayout(cropLabel,liters,rect);
+    const textLayout=zoneTextLayout(zoneLabel,liters,rect);
 
     html+=`<g data-zone-id="${zone.id}">
       <rect class="zone-rect${selected?" zone-selected":""}" data-zone-id="${zone.id}" data-action="move" x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" fill="${crop.color}" stroke="${statusColor}"></rect>
-      <text class="zone-label" text-anchor="middle" x="${centerX}" y="${textLayout.labelY}" font-size="${textLayout.labelFont}"${textLayout.labelTextLength}>${escapeHtml(cropLabel)}</text>
+      <text class="zone-label" text-anchor="middle" x="${centerX}" y="${textLayout.labelY}" font-size="${textLayout.labelFont}"${textLayout.labelTextLength}>${escapeHtml(zoneLabel)}</text>
       <text class="zone-liters" text-anchor="middle" x="${centerX}" y="${textLayout.litersY}" font-size="${textLayout.litersFont}"${textLayout.litersTextLength}>${escapeHtml(liters)}</text>
       ${selected?`<circle class="zone-handle" data-zone-id="${zone.id}" data-action="resize" cx="${rect.x+rect.width}" cy="${rect.y+rect.height}" r="0.11"></circle>`:""}
     </g>`;
@@ -607,7 +622,7 @@ function renderZonesList(zoneMetrics){
       </div>
       <p class="muted">${item.status.message}</p>
       <div class="zone-actions">
-        <button class="ghost-button" type="button" data-action="watered" data-zone-id="${item.zone.id}">💧 J’ai arrosé</button>
+        ${item.zone.finished?`<span class="finished-note">Culture terminée</span>`:`<button class="ghost-button" type="button" data-action="watered" data-zone-id="${item.zone.id}">💧 J’ai arrosé</button>`}
       </div>
     </article>`;
   }).join("");
@@ -694,7 +709,8 @@ function saveZone(event){
     flow:Math.max(.1,num(dom.zoneFlow.value)),
     seasonMode:dom.zoneSeasonMode.value,
     kc:Math.max(0,num(dom.zoneKc.value)),
-    lastWatering:dom.zoneLastWatering.value
+    lastWatering:dom.zoneLastWatering.value,
+    finished:dom.zoneFinished.checked
   };
 
   state.zones[index]=normalizeZone(zone,state);
@@ -713,7 +729,7 @@ function handleZoneListClick(event){
 function markZoneWatered(zoneId){
   const state=settings();
   const zone=state.zones.find(item=>String(item.id)===String(zoneId));
-  if(!zone)return;
+  if(!zone||zone.finished)return;
   zone.lastWatering=localDateString(new Date());
   persistSettings(state);
   render();
@@ -725,8 +741,7 @@ function deleteSelectedZone(){
   const zone=state.zones.find(item=>String(item.id)===String(selectedZoneId));
   if(!zone)return;
 
-  const cropLabel=getCropLabel(zone);
-  const confirmed=window.confirm(`Supprimer la zone « ${cropLabel} » ? Cette action supprimera son suivi d’arrosage.`);
+  const confirmed=window.confirm(`Supprimer la zone « ${zone.name||"Zone"} » ? Cette action supprimera son suivi d’arrosage.`);
   if(!confirmed)return;
 
   state.zones=state.zones.filter(item=>String(item.id)!==String(selectedZoneId));
